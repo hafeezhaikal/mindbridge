@@ -1,0 +1,421 @@
+{% extends "base.html" %}
+{% set step_index = 5 %}
+{% block title %}Focus Tap{% endblock %}
+
+{% block head %}
+<style>
+  .game-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .stat-box {
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.7rem;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: var(--font-head);
+    font-size: 24px;
+    font-weight: 400;
+  }
+  .stat-label {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+
+  #gameArena {
+    position: relative;
+    width: 100%;
+    height: 280px;
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    cursor: crosshair;
+    margin-bottom: 1rem;
+  }
+  .target {
+    position: absolute;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transform: translate(-50%, -50%) scale(0);
+    transition: transform 0.12s ease-out;
+    font-family: var(--font-head);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--navy);
+    border: none;
+    animation: targetPop 0.12s ease forwards;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+  }
+  .target.type-a { background: var(--teal); box-shadow: 0 0 6px rgba(46,196,182,0.5); }
+  .target.type-b { background: var(--gold); box-shadow: 0 0 8px rgba(244,201,75,0.6); }
+  .target.type-c { background: var(--coral); width: 40px; height: 40px; font-size: 12px; }
+  @keyframes targetPop {
+    to { transform: translate(-50%, -50%) scale(1); }
+  }
+  .target.hit {
+    animation: targetHit 0.15s ease forwards !important;
+  }
+  @keyframes targetHit {
+    to { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  }
+  .combo-popup {
+    position: absolute;
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--gold);
+    pointer-events: none;
+    animation: floatUp 0.6s ease-out forwards;
+    text-shadow: 0 0 4px black;
+  }
+  @keyframes floatUp {
+    0% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-40px); }
+  }
+  .flash-effect {
+    position: absolute;
+    inset: 0;
+    background: rgba(46,196,182,0.2);
+    pointer-events: none;
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.08s;
+  }
+  .streak-bar-wrap { margin-bottom: 0.75rem; }
+  .streak-label { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+  .streak-bar-fill { background: linear-gradient(90deg, var(--teal), var(--gold)); }
+
+  #countdownOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(30,45,61,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    border-radius: inherit;
+  }
+  .countdown-num { font-family: var(--font-head); font-size: 64px; color: var(--teal); }
+  .countdown-label { font-size: 14px; color: var(--muted); }
+
+  #doneOverlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(30,45,61,0.92);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 1.5rem;
+    z-index: 10;
+    border-radius: inherit;
+  }
+  #doneOverlay.show { display: flex; }
+  .difficulty-marker {
+    font-size: 10px;
+    color: var(--gold);
+    text-align: right;
+    margin-top: -0.5rem;
+    margin-bottom: 0.5rem;
+  }
+  @media (max-width: 500px) {
+    .stat-val { font-size: 20px; }
+    .target { width: 42px; height: 42px; font-size: 12px; }
+    .target.type-c { width: 36px; height: 36px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <p class="section-label">Activity — Focus Boost</p>
+  <h2 class="page-title" style="font-size:22px;">Focus Tap<br>Challenge</h2>
+  <p class="page-sub" style="font-size:12px;margin-top:0.3rem;">Tap targets: Teal +1, Gold +2, Red -1. Consecutive hits multiply your score!</p>
+
+  <div class="game-stats">
+    <div class="stat-box"><div class="stat-val" id="scoreVal" style="color:var(--teal);">0</div><div class="stat-label">Score</div></div>
+    <div class="stat-box"><div class="stat-val" id="timeVal" style="color:var(--white);">30</div><div class="stat-label">Seconds</div></div>
+    <div class="stat-box"><div class="stat-val" id="missVal" style="color:var(--coral);">0</div><div class="stat-label">Misses</div></div>
+  </div>
+
+  <div class="streak-bar-wrap">
+    <div class="streak-label">🔥 Combo: <span id="streakLabel">0</span> × <span id="multiplierSpan">1</span></div>
+    <div class="progress-bar"><div class="progress-fill streak-bar-fill" id="streakBar" style="width:0%;"></div></div>
+  </div>
+  <div class="difficulty-marker" id="difficultyMarker">⚡ Speed: normal</div>
+
+  <div id="gameArena">
+    <div class="flash-effect" id="flashEffect"></div>
+    <div id="countdownOverlay">
+      <div class="countdown-num" id="cdNum">3</div>
+      <div class="countdown-label">Get ready...</div>
+    </div>
+    <div id="doneOverlay">
+      <h3 style="font-family:var(--font-head);font-size:22px;margin-bottom:0.5rem;" id="doneTitle">Time Up!</h3>
+      <p style="color:var(--muted);font-size:13px;margin-bottom:1rem;" id="doneMsg"></p>
+      <a href="/result" class="btn btn-primary" style="width:100%;max-width:200px;">View Report</a>
+      <a href="/game/focus_tap" class="btn btn-ghost" style="margin-top:8px;">Play Again</a>
+    </div>
+  </div>
+  <p style="font-size:11px;color:var(--muted);text-align:center;">Teal +1 | Gold +2 | Red -1 | Consecutive taps increase multiplier (up to 5x)!</p>
+</div>
+
+<script>
+  // ---------- DOM elements ----------
+  const scoreSpan = document.getElementById('scoreVal');
+  const timeSpan = document.getElementById('timeVal');
+  const missSpan = document.getElementById('missVal');
+  const streakSpan = document.getElementById('streakLabel');
+  const multiplierSpan = document.getElementById('multiplierSpan');
+  const streakBar = document.getElementById('streakBar');
+  const difficultyMarker = document.getElementById('difficultyMarker');
+  const gameArena = document.getElementById('gameArena');
+  const flashEl = document.getElementById('flashEffect');
+
+  // ---------- Game state ----------
+  let score = 0;
+  let misses = 0;
+  let streak = 0;
+  let multiplier = 1;
+  let timeLeft = 30;
+  let gameRunning = false;
+  let spawnInterval = null;
+  let gameTimer = null;
+  let targets = [];
+  let targetIdCounter = 0;
+  let baseSpawnDelay = 750;    // ms between spawns (starts at 750)
+  let currentSpawnDelay = 750;
+  let difficultyStep = 0;       // increases over time
+
+  // Vibration support
+  const vibrateSupported = 'vibrate' in navigator;
+
+  function vibrate(pattern) {
+    if (vibrateSupported && gameRunning) {
+      navigator.vibrate(pattern);
+    }
+  }
+
+  // Update UI with streak, multiplier, score, misses
+  function updateStats() {
+    scoreSpan.textContent = score;
+    missSpan.textContent = misses;
+    streakSpan.textContent = streak;
+    multiplierSpan.textContent = multiplier;
+    const barPercent = Math.min((streak / 10) * 100, 100);
+    streakBar.style.width = barPercent + '%';
+    if (streak >= 5) streakBar.style.background = 'linear-gradient(90deg, var(--gold), var(--coral))';
+    else streakBar.style.background = 'linear-gradient(90deg, var(--teal), var(--gold))';
+  }
+
+  // Show a floating "+X" near the target
+  function showFloatingText(x, y, text, color = 'var(--gold)') {
+    const div = document.createElement('div');
+    div.className = 'combo-popup';
+    div.textContent = text;
+    div.style.left = x + 'px';
+    div.style.top = y + 'px';
+    div.style.color = color;
+    div.style.fontSize = '16px';
+    div.style.fontWeight = 'bold';
+    document.getElementById('gameArena').appendChild(div);
+    setTimeout(() => div.remove(), 600);
+  }
+
+  // Flash the screen briefly
+  function flashScreen(color = 'rgba(46,196,182,0.25)') {
+    flashEl.style.backgroundColor = color;
+    flashEl.style.opacity = '1';
+    setTimeout(() => { flashEl.style.opacity = '0'; }, 80);
+  }
+
+  // Hit target logic
+  function hitTarget(btn, type, event) {
+    if (!gameRunning) return;
+    const rect = btn.getBoundingClientRect();
+    const arenaRect = gameArena.getBoundingClientRect();
+    const x = rect.left + rect.width/2 - arenaRect.left;
+    const y = rect.top + rect.height/2 - arenaRect.top;
+    
+    let basePoints = { 'type-a': 1, 'type-b': 2, 'type-c': -1 }[type];
+    let points = basePoints * multiplier;
+    btn.classList.add('hit');
+    vibrate(30);
+
+    if (points > 0) {
+      streak++;
+      if (streak >= 3 && multiplier < 3) multiplier = 2;
+      if (streak >= 6 && multiplier < 5) multiplier = 3;
+      if (streak >= 9 && multiplier < 5) multiplier = 5;
+      if (streak >= 12) multiplier = 5;
+      showFloatingText(x, y, `+${points}`, 'var(--gold)');
+      flashScreen();
+    } else {
+      streak = 0;
+      multiplier = 1;
+      showFloatingText(x, y, `${points}`, 'var(--coral)');
+      flashScreen('rgba(255,107,107,0.3)');
+      vibrate(50);
+    }
+    score = Math.max(0, score + points);
+    updateStats();
+    setTimeout(() => { if (btn.parentNode) btn.parentNode.removeChild(btn); }, 150);
+  }
+
+  // Spawn a new target at random position
+  function spawnTarget() {
+    if (!gameRunning) return;
+    const arena = document.getElementById('gameArena');
+    const id = 'tgt-' + (targetIdCounter++);
+    // weighted random: type-a 45%, type-b 35%, type-c 20%
+    const r = Math.random();
+    let type = 'type-a';
+    if (r < 0.35) type = 'type-b';
+    else if (r < 0.55) type = 'type-c';
+    const labels = { 'type-a': '+1', 'type-b': '+2', 'type-c': '-1' };
+    const btn = document.createElement('button');
+    btn.className = 'target ' + type;
+    btn.id = id;
+    btn.textContent = labels[type];
+    const px = 10 + Math.random() * 80;
+    const py = 10 + Math.random() * 75;
+    btn.style.left = px + '%';
+    btn.style.top = py + '%';
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      hitTarget(btn, type, e);
+    });
+    arena.appendChild(btn);
+    // lifetime 1.2-1.8 seconds
+    const lifetime = 1200 + Math.random() * 600;
+    const expiry = setTimeout(() => {
+      if (document.getElementById(id)) {
+        if (gameRunning) {
+          if (type !== 'type-c') {
+            misses++;
+            streak = 0;
+            multiplier = 1;
+            vibrate(60);
+            updateStats();
+            flashScreen('rgba(255,107,107,0.2)');
+          }
+        }
+        if (btn.parentNode) btn.parentNode.removeChild(btn);
+      }
+    }, lifetime);
+    targets.push({ id, expiry });
+  }
+
+  // Update difficulty dynamically (spawn delay decreases every 5 seconds)
+  function updateDifficulty() {
+    if (!gameRunning) return;
+    difficultyStep++;
+    if (difficultyStep >= 5 && currentSpawnDelay > 400) {
+      currentSpawnDelay = Math.max(400, currentSpawnDelay - 40);
+      if (spawnInterval) {
+        clearInterval(spawnInterval);
+        spawnInterval = setInterval(spawnTarget, currentSpawnDelay);
+      }
+      const speedText = currentSpawnDelay <= 500 ? 'very fast' : currentSpawnDelay <= 620 ? 'fast' : 'normal';
+      difficultyMarker.innerHTML = `⚡ Speed: ${speedText} (${Math.round(1000/currentSpawnDelay)}/min)`;
+    }
+  }
+
+  // End game, show results, save
+  function endGame() {
+    if (!gameRunning) return;
+    gameRunning = false;
+    clearInterval(spawnInterval);
+    clearInterval(gameTimer);
+    targets.forEach(t => clearTimeout(t.expiry));
+    document.querySelectorAll('.target').forEach(t => t.remove());
+    targets = [];
+
+    let rating = '';
+    if (score >= 45) rating = 'Excellent focus! You\'re very engaged.';
+    else if (score >= 30) rating = 'Good concentration! Keep training.';
+    else if (score >= 15) rating = 'Moderate focus. Practice helps.';
+    else rating = 'Low focus detected. Maybe rest and try again later.';
+    document.getElementById('doneTitle').textContent = `Final Score: ${score}`;
+    document.getElementById('doneMsg').innerHTML = `${rating}<br>Max combo: ${Math.max(streak, 0)} × ${multiplier}`;
+    document.getElementById('doneOverlay').classList.add('show');
+
+    fetch('/api/save-game-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'focus_tap',
+        score: score,
+        misses: misses,
+        maxCombo: streak,
+        multiplier: multiplier,
+        completed: true
+      })
+    });
+  }
+
+  // Timer update
+  function startTimer() {
+    gameTimer = setInterval(() => {
+      if (!gameRunning) return;
+      timeLeft--;
+      timeSpan.textContent = timeLeft;
+      if (timeLeft <= 5) timeSpan.style.color = 'var(--coral)';
+      if (timeLeft <= 0) endGame();
+    }, 1000);
+  }
+
+  // Start game after countdown
+  function startGame() {
+    gameRunning = true;
+    score = 0; misses = 0; streak = 0; multiplier = 1; timeLeft = 30;
+    targetIdCounter = 0;
+    difficultyStep = 0;
+    currentSpawnDelay = baseSpawnDelay;
+    updateStats();
+    timeSpan.textContent = '30';
+    timeSpan.style.color = 'var(--white)';
+    difficultyMarker.innerHTML = '⚡ Speed: normal';
+    startTimer();
+    spawnInterval = setInterval(spawnTarget, currentSpawnDelay);
+    // Difficulty ramp: every 5 seconds, increase speed
+    const diffInterval = setInterval(() => {
+      if (!gameRunning) { clearInterval(diffInterval); return; }
+      updateDifficulty();
+    }, 5000);
+    window.diffRamp = diffInterval;
+    // Clean up on end
+    const oldEnd = endGame;
+    window.endGame = endGame;
+  }
+
+  // Countdown
+  window.addEventListener('DOMContentLoaded', () => {
+    let cd = 3;
+    const cdNum = document.getElementById('cdNum');
+    const cdInterval = setInterval(() => {
+      cd--;
+      if (cd <= 0) {
+        clearInterval(cdInterval);
+        document.getElementById('countdownOverlay').style.display = 'none';
+        startGame();
+      } else {
+        cdNum.textContent = cd;
+      }
+    }, 1000);
+  });
+</script>
+{% endblock %}

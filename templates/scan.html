@@ -1,0 +1,559 @@
+{% extends "base.html" %}
+{% set step_index = 2 %}
+{% block title %}Face Scan{% endblock %}
+
+{% block head %}
+<style>
+  .scan-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .camera-frame {
+    position: relative;
+    width: 70vw;
+    max-width: 350px;
+    aspect-ratio: 3 / 4;
+    border-radius: 24px;
+    border: 2px solid var(--teal);
+    background: var(--navy-card);
+    margin: 1rem auto;
+    overflow: hidden;
+    box-shadow: 0 0 0 2px rgba(46,196,182,0.2);
+    transition: border-color 0.2s;
+  }
+  .camera-frame.face-detected {
+    border-color: var(--sage);
+    box-shadow: 0 0 0 2px rgba(123,232,166,0.4);
+  }
+  .camera-video {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .overlay-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+  }
+  .face-guide {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60%;
+    aspect-ratio: 1 / 1;
+    border-radius: 50%;
+    border: 1px dashed rgba(46,196,182,0.5);
+    pointer-events: none;
+    z-index: 2;
+  }
+  .pulse-ring {
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(46,196,182,0.4);
+    animation: pulse-ring 2.5s ease-out infinite;
+    pointer-events: none;
+  }
+  .pulse-ring-2 { animation-delay: 1.25s; }
+  @keyframes pulse-ring {
+    0% { transform: scale(0.95); opacity: 0.8; }
+    100% { transform: scale(1.15); opacity: 0; }
+  }
+  .scan-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--teal), transparent);
+    animation: scanLine 2s ease-in-out infinite;
+    top: 0;
+    pointer-events: none;
+    z-index: 1;
+  }
+  @keyframes scanLine {
+    0% { top: 0%; opacity: 1; }
+    100% { top: 100%; opacity: 0.2; }
+  }
+  .progress-bar {
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    height: 6px;
+    overflow: hidden;
+    margin: 0.8rem 0;
+  }
+  .progress-fill {
+    background: var(--teal);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+  }
+  .big-score {
+    font-family: var(--font-head);
+    font-size: 40px;
+    font-weight: 400;
+    margin: 0.3rem 0;
+    opacity: 0;
+    transition: opacity 0.5s;
+  }
+  .big-score.show { opacity: 1; }
+  .cv-stages {
+    width: 100%;
+    margin-top: 1rem;
+    background: var(--navy-card);
+    border-radius: 16px;
+    padding: 0.8rem;
+  }
+  .cv-stage-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .cv-stage-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: all 0.2s;
+  }
+  .cv-stage-dot.active { background: var(--teal); box-shadow: 0 0 6px var(--teal); }
+  .cv-stage-dot.done { background: var(--sage); }
+  .cv-stage-label {
+    font-size: 12px;
+    color: var(--muted);
+    flex: 1;
+    text-align: left;
+  }
+  .cv-stage-val {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--white);
+  }
+  .fallback-section {
+    margin-top: 0.8rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border);
+  }
+  .timer {
+    font-size: 16px;
+    font-weight: bold;
+    margin-top: 6px;
+    color: var(--gold);
+  }
+  .smile-message {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+  .detection-counter {
+    font-size: 11px;
+    color: var(--teal);
+    margin-top: 5px;
+  }
+  @media (max-width: 500px) {
+    .camera-frame {
+      width: 85vw;
+      max-width: 300px;
+    }
+    .cv-stage-label, .cv-stage-val {
+      font-size: 11px;
+    }
+    .big-score {
+      font-size: 32px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <div style="margin-bottom:0.8rem; text-align:center;">
+    <p class="section-label">Step 2 of 4</p>
+    <h2 class="page-title" style="font-size:22px;">Computer Vision<br>Face Analysis</h2>
+    <p class="page-sub" style="font-size:12px;margin-top:0.2rem;">Processing facial expressions on-device. No data leaves your device.</p>
+  </div>
+
+  <div class="scan-wrap">
+    <div class="camera-frame" id="cameraFrame">
+      <div class="pulse-ring"></div>
+      <div class="pulse-ring pulse-ring-2"></div>
+      <div class="scan-line" id="scanLine"></div>
+      <div class="face-guide"></div>
+      <video id="webcam" class="camera-video" autoplay muted playsinline></video>
+      <canvas id="overlayCanvas" class="overlay-canvas"></canvas>
+    </div>
+    <p id="scanStatusText" style="font-size:12px;font-weight:600;color:var(--teal);margin-bottom:0.3rem;">Initialising camera...</p>
+    <div class="progress-bar" style="width:100%;margin-bottom:0.3rem;">
+      <div class="progress-fill" id="cvProgressBar" style="width:0%;"></div>
+    </div>
+    <div id="timerDisplay" class="timer">-- s remaining</div>
+    <div id="smileMessage" class="smile-message">😊 Smile, frown, or surprise – we'll track your expressions!</div>
+    <div class="detection-counter" id="detectionCountDisplay">Detections: 0</div>
+    <div class="big-score" id="cvScoreDisplay" style="color:var(--gold);">--</div>
+    <p style="font-size:10px;color:var(--muted);" id="cvScoreLabel"></p>
+  </div>
+
+  <div class="cv-stages">
+    <p class="card-label" style="margin-bottom: 0.3rem;">Expression Pipeline</p>
+    <div class="cv-stage-row"><div class="cv-stage-dot" id="d0"></div><div class="cv-stage-label">Loading models</div><div class="cv-stage-val" id="v0">--</div></div>
+    <div class="cv-stage-row"><div class="cv-stage-dot" id="d1"></div><div class="cv-stage-label">Camera access</div><div class="cv-stage-val" id="v1">--</div></div>
+    <div class="cv-stage-row"><div class="cv-stage-dot" id="d2"></div><div class="cv-stage-label">Face detection</div><div class="cv-stage-val" id="v2">--</div></div>
+    <div class="cv-stage-row"><div class="cv-stage-dot" id="d3"></div><div class="cv-stage-label">Expression</div><div class="cv-stage-val" id="v3">--</div></div>
+    <div class="cv-stage-row"><div class="cv-stage-dot" id="d4"></div><div class="cv-stage-label">Stress indicator</div><div class="cv-stage-val" id="v4">--</div></div>
+    <div class="cv-stage-row"><div class="cv-stage-dot" id="d5"></div><div class="cv-stage-label">Final CV score</div><div class="cv-stage-val" id="v5">--</div></div>
+  </div>
+
+  <div class="fallback-section" id="fallbackSection" style="display: none;">
+    <p style="font-size: 11px; color: var(--coral); text-align: center; margin-bottom: 0.5rem;">
+      ⚠️ Camera or model error. Continue with simulation.
+    </p>
+    <button id="fallbackButton" class="btn-secondary" style="width: 100%;">Continue with Simulation →</button>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.min.js"></script>
+
+<script>
+  (function() {
+    console.log("Enhanced face scan with expression averaging");
+
+    // DOM elements
+    const video = document.getElementById('webcam');
+    const canvas = document.getElementById('overlayCanvas');
+    const ctx = canvas.getContext('2d');
+    const statusText = document.getElementById('scanStatusText');
+    const progressFill = document.getElementById('cvProgressBar');
+    const scoreDisplay = document.getElementById('cvScoreDisplay');
+    const scoreLabel = document.getElementById('cvScoreLabel');
+    const scanLine = document.getElementById('scanLine');
+    const timerDisplay = document.getElementById('timerDisplay');
+    const smileMessage = document.getElementById('smileMessage');
+    const cameraFrame = document.getElementById('cameraFrame');
+    const detectionCountSpan = document.getElementById('detectionCountDisplay');
+
+    const dots = ['d0','d1','d2','d3','d4','d5'].map(id => document.getElementById(id));
+    const valueSpans = ['v0','v1','v2','v3','v4','v5'].map(id => document.getElementById(id));
+    let currentStage = -1;
+    let analysisCompleted = false;
+    let fallbackShown = false;
+    let detectionInterval = null;
+    let startTime = null;
+    const SESSION_DURATION = 15000; // 15 seconds
+
+    // Store detections for accurate final decision
+    let detectionLog = []; // each entry: { expr, confidence, stressScore }
+    let faceDetectedFlag = false;
+
+    function updateStage(index, formatted = null) {
+      if (index > currentStage) {
+        if (currentStage >= 0) {
+          dots[currentStage].classList.remove('active');
+          dots[currentStage].classList.add('done');
+        }
+        currentStage = index;
+        dots[currentStage].classList.add('active');
+      }
+      if (formatted !== null) {
+        valueSpans[currentStage].textContent = formatted;
+      }
+      const targetPercent = ((index + 1) / dots.length) * 100;
+      progressFill.style.width = targetPercent + '%';
+    }
+
+    // Map expression to stress score (0 = low stress, 1 = high stress)
+    function expressionToStress(expression, confidence) {
+      const map = {
+        'happy': 0.20,
+        'neutral': 0.45,
+        'surprised': 0.35,
+        'sad': 0.70,
+        'angry': 0.85,
+        'fearful': 0.80,
+        'disgusted': 0.75
+      };
+      let base = map[expression] || 0.50;
+      // If confidence low, move toward neutral
+      if (confidence < 0.6) base = base * 0.6 + 0.45 * 0.4;
+      return Math.min(0.95, Math.max(0.10, base));
+    }
+
+    // Draw bounding box and label
+    function drawDetection(detection) {
+      if (!detection || !detection.detection || !detection.expressions) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        return;
+      }
+      const box = detection.detection.box;
+      const expressions = detection.expressions;
+      let maxExpr = 'neutral', maxConf = 0;
+      for (const [expr, conf] of Object.entries(expressions)) {
+        if (conf > maxConf) { maxConf = conf; maxExpr = expr; }
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#00FF00';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(box.x, box.y, box.width, box.height);
+      ctx.font = 'bold 14px "Segoe UI", Arial, sans-serif';
+      ctx.fillStyle = '#00FF00';
+      ctx.shadowColor = 'black';
+      ctx.shadowBlur = 3;
+      ctx.fillText(`${maxExpr} (${(maxConf*100).toFixed(0)}%)`, box.x, box.y - 6);
+      ctx.shadowBlur = 0;
+
+      // Update pipeline stage 3 in real time
+      if (currentStage >= 2 && !analysisCompleted) {
+        valueSpans[3].textContent = `${maxExpr} (${(maxConf*100).toFixed(0)}%)`;
+      }
+      return { expr: maxExpr, conf: maxConf };
+    }
+
+    function resizeCanvas() {
+      canvas.width = video.clientWidth;
+      canvas.height = video.clientHeight;
+    }
+
+    // Final decision: most frequent expression, with tie-breaking by confidence
+    function getFinalExpression() {
+      if (detectionLog.length === 0) {
+        return { expr: 'neutral', conf: 0.5, stress: 0.5 };
+      }
+      // Count frequency of each expression
+      const counts = {};
+      const confSums = {};
+      for (let d of detectionLog) {
+        counts[d.expr] = (counts[d.expr] || 0) + 1;
+        confSums[d.expr] = (confSums[d.expr] || 0) + d.confidence;
+      }
+      // Find expression with highest count
+      let maxCount = 0;
+      let bestExpr = 'neutral';
+      for (let [expr, count] of Object.entries(counts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          bestExpr = expr;
+        }
+      }
+      // Average confidence for best expression
+      const avgConf = confSums[bestExpr] / counts[bestExpr];
+      const stress = expressionToStress(bestExpr, avgConf);
+      return { expr: bestExpr, conf: avgConf, stress: stress };
+    }
+
+    function completeAnalysisAndRedirect() {
+      if (analysisCompleted) return;
+      analysisCompleted = true;
+      if (detectionInterval) clearInterval(detectionInterval);
+      if (scanLine) scanLine.style.display = 'none';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let finalExpr = 'neutral';
+      let finalConf = 0.5;
+      let cvScore = 0.5;
+      if (detectionLog.length > 0) {
+        const final = getFinalExpression();
+        finalExpr = final.expr;
+        finalConf = final.conf;
+        cvScore = final.stress;
+      } else {
+        // No face detected at all – use default neutral
+        cvScore = 0.5;
+        finalExpr = 'neutral';
+      }
+
+      // Display final score
+      scoreDisplay.textContent = (cvScore * 100).toFixed(0) + '%';
+      scoreDisplay.style.color = cvScore > 0.65 ? '#FF6B6B' : (cvScore > 0.4 ? '#FFD700' : '#7BE8A6');
+      scoreDisplay.classList.add('show');
+      const labels = ['Very Low Stress','Low Stress','Moderate Stress','High Stress','Very High Stress'];
+      scoreLabel.textContent = 'Facial stress indicator: ' + labels[Math.min(Math.floor(cvScore * 5), 4)];
+      updateStage(4, `${(cvScore*100).toFixed(0)}% stress`);
+      updateStage(5, cvScore.toFixed(3));
+
+      // Prepare payload
+      let existingPayload = {};
+      try {
+        existingPayload = JSON.parse(sessionStorage.getItem('checkinPayload') || '{}');
+      } catch(e) {}
+      existingPayload.cv_score = parseFloat(cvScore.toFixed(3));
+      existingPayload.detected_emotion = finalExpr;
+      existingPayload.error_rate = 0; // No game played yet; set 0
+      sessionStorage.setItem('checkinPayload', JSON.stringify(existingPayload));
+
+      // Send to backend
+      fetch('/api/analyse-checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(existingPayload)
+      })
+      .then(r => r.json())
+      .then(data => {
+        sessionStorage.setItem('analysisResult', JSON.stringify(data));
+        window.location.href = '/analysis';
+      })
+      .catch(err => {
+        console.error('API error', err);
+        window.location.href = '/analysis';
+      });
+    }
+
+    function updateTimer() {
+      if (!startTime) return;
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, SESSION_DURATION - elapsed);
+      const seconds = (remaining / 1000).toFixed(0);
+      timerDisplay.textContent = `${seconds} s remaining`;
+      if (remaining <= 0) {
+        timerDisplay.textContent = "0 s remaining";
+        smileMessage.textContent = "✨ Analysis complete! Redirecting... ✨";
+        if (detectionInterval) clearInterval(detectionInterval);
+        if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+        completeAnalysisAndRedirect();
+      } else if (remaining <= 3000) {
+        smileMessage.textContent = "🎉 Almost done! Get ready for your results. 🎉";
+      } else if (remaining <= 8000) {
+        smileMessage.textContent = "😃 Keep making faces – your emotions matter! 😃";
+      } else {
+        const messages = [
+          "😊 Smile – it makes you feel better!",
+          "😮 Try looking surprised!",
+          "😌 Take a deep breath and relax.",
+          "🤔 Think of something funny.",
+          "😁 Big smile! You're doing great."
+        ];
+        const idx = Math.floor((Date.now() / 4000) % messages.length);
+        smileMessage.textContent = messages[idx];
+      }
+    }
+
+    async function startRealAnalysis() {
+      try {
+        statusText.textContent = 'Loading models...';
+        updateStage(0, 'loading...');
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/static/models');
+        await faceapi.nets.faceExpressionNet.loadFromUri('/static/models');
+        console.log('Models loaded');
+        updateStage(0, 'loaded');
+
+        statusText.textContent = 'Requesting camera...';
+        updateStage(1, 'requesting...');
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        video.srcObject = stream;
+        await video.play();
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        await new Promise(r => setTimeout(r, 500));
+        updateStage(1, 'ready');
+
+        statusText.textContent = 'Analyzing... (15s session)';
+        updateStage(2, 'detecting face...');
+
+        startTime = Date.now();
+        const timerInterval = setInterval(updateTimer, 200);
+        let detectionCount = 0;
+
+        detectionInterval = setInterval(async () => {
+          if (!video.videoWidth || analysisCompleted) return;
+          const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224 })).withFaceExpressions();
+          if (detection && detection.expressions) {
+            // Update UI for face detected
+            if (!faceDetectedFlag) {
+              faceDetectedFlag = true;
+              cameraFrame.classList.add('face-detected');
+            }
+            const { expr, conf } = drawDetection(detection);
+            detectionCount++;
+            detectionCountSpan.textContent = `Detections: ${detectionCount}`;
+            // Store for final decision
+            const stress = expressionToStress(expr, conf);
+            detectionLog.push({ expr: expr, confidence: conf, stressScore: stress });
+            // Update pipeline stages
+            if (currentStage < 2) updateStage(2, 'face detected');
+            if (currentStage < 3) updateStage(3, 'analysing...');
+          } else {
+            // No face – clear canvas and remove green border if no face for a while
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            if (faceDetectedFlag) {
+              // We don't immediately remove border because face may reappear
+              // But after several attempts, we might show a message
+            }
+          }
+        }, 200); // every 200ms for smooth drawing
+
+        const endSession = () => {
+          clearInterval(timerInterval);
+          if (detectionInterval) clearInterval(detectionInterval);
+          if (video.srcObject) video.srcObject.getTracks().forEach(track => track.stop());
+          completeAnalysisAndRedirect();
+        };
+        setTimeout(endSession, SESSION_DURATION);
+      } catch (err) {
+        console.error('Startup error:', err);
+        statusText.textContent = 'Error: ' + (err.message || 'Camera/models failed');
+        document.getElementById('fallbackSection').style.display = 'block';
+        document.getElementById('fallbackButton').onclick = () => useFallbackSimulation();
+        fallbackShown = true;
+      }
+    }
+
+    function useFallbackSimulation() {
+      if (fallbackShown) return;
+      fallbackShown = true;
+      if (detectionInterval) clearInterval(detectionInterval);
+      statusText.textContent = 'Using simulation mode.';
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = 0; i < dots.length; i++) {
+        dots[i].classList.remove('active');
+        dots[i].classList.add('done');
+      }
+      valueSpans[0].textContent = 'simulated';
+      valueSpans[1].textContent = 'simulated';
+      valueSpans[2].textContent = 'simulated';
+      valueSpans[3].textContent = 'neutral';
+      valueSpans[4].textContent = '0.50';
+      valueSpans[5].textContent = '0.50';
+      // Set fallback payload
+      let existingPayload = {};
+      try {
+        existingPayload = JSON.parse(sessionStorage.getItem('checkinPayload') || '{}');
+      } catch(e) {}
+      existingPayload.cv_score = 0.5;
+      existingPayload.detected_emotion = 'neutral';
+      existingPayload.error_rate = 0;
+      sessionStorage.setItem('checkinPayload', JSON.stringify(existingPayload));
+      progressFill.style.width = '100%';
+      setTimeout(() => {
+        fetch('/api/analyse-checkin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(existingPayload)
+        })
+        .then(r => r.json())
+        .then(data => {
+          sessionStorage.setItem('analysisResult', JSON.stringify(data));
+          window.location.href = '/analysis';
+        })
+        .catch(() => { window.location.href = '/analysis'; });
+      }, 1500);
+    }
+
+    window.addEventListener('load', () => {
+      const checkReady = setInterval(() => {
+        if (typeof faceapi !== 'undefined' && faceapi.nets) {
+          clearInterval(checkReady);
+          setTimeout(startRealAnalysis, 200);
+        }
+      }, 100);
+      setTimeout(() => {
+        clearInterval(checkReady);
+        if (typeof faceapi === 'undefined') useFallbackSimulation();
+      }, 5000);
+    });
+  })();
+</script>
+{% endblock %}

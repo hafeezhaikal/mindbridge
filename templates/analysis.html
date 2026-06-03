@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% set step_index = 3 %}
+{% block title %}AI Analysis{% endblock %}
+
+{% block head %}
+<style>
+  .score-ring-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    margin: 1rem 0 1.5rem;
+  }
+  .ring-svg { transform: rotate(-90deg); }
+  .ring-bg   { fill: none; stroke: var(--navy-card); stroke-width: 10; }
+  .ring-fill {
+    fill: none; stroke-width: 10; stroke-linecap: round;
+    stroke-dasharray: 283; stroke-dashoffset: 283;
+    transition: stroke-dashoffset 1.2s ease;
+  }
+  .ring-center {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); text-align: center;
+  }
+  .ring-pct {
+    font-family: var(--font-head); font-size: 38px;
+    font-weight: 400; line-height: 1;
+  }
+  .ring-label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+
+  .formula-card {
+    background: var(--navy-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+    font-family: 'Courier New', monospace;
+  }
+  .formula-line { font-size: 11px; color: var(--muted); line-height: 2; }
+  .formula-var  { color: var(--teal); }
+  .formula-num  { color: var(--gold); }
+  .formula-result { font-size: 13px; color: var(--white); font-weight: 700; }
+
+  .metric-bar { height: 5px; background: var(--border); border-radius: 99px; margin-top: 5px; overflow: hidden; }
+  .metric-bar-fill { height: 100%; border-radius: 99px; background: var(--teal); transition: width 1s ease; }
+
+  .game-rec {
+    background: rgba(244,201,75,0.08); border: 1.5px solid rgba(244,201,75,0.3);
+    border-radius: var(--radius); padding: 1.1rem 1.2rem; margin-bottom: 1.25rem;
+  }
+  .game-rec-title { font-size: 15px; font-weight: 600; color: var(--gold); margin-bottom: 0.4rem; }
+  .game-rec-desc  { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .game-rec-reason {
+    margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(244,201,75,0.15);
+    font-size: 11px; color: rgba(244,201,75,0.7); line-height: 1.5;
+  }
+
+  .xai-tag {
+    display: inline-block; padding: 3px 9px; border-radius: 99px;
+    font-size: 10px; font-weight: 600; letter-spacing: 0.5px;
+    background: rgba(195,177,225,0.15); color: var(--lilac);
+    margin-bottom: 0.5rem;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up" id="analysisPage">
+  <div style="margin-bottom:1.25rem;">
+    <p class="section-label">Step 3 of 4</p>
+    <h2 class="page-title" style="font-size:24px;">AI Analysis<br>Results</h2>
+  </div>
+
+  <div class="score-ring-wrap">
+    <div style="position:relative;width:140px;height:140px;">
+      <svg class="ring-svg" width="140" height="140" viewBox="0 0 100 100">
+        <circle class="ring-bg" cx="50" cy="50" r="45"/>
+        <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="45"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-pct" id="scorePct">0%</div>
+        <div class="ring-label" id="statusLabel">--</div>
+      </div>
+    </div>
+    <div id="statusBadge" class="badge" style="margin-top:0.75rem;">--</div>
+  </div>
+
+  <div class="xai-tag">Explainable AI (XAI) Breakdown</div>
+  <div class="card" id="metricsCard">
+    <div class="metric-row">
+      <div><div class="metric-label">NLP Sentiment (x2, w=0.4)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-nlp" style="width:0%"></div></div></div>
+      <div class="metric-value" id="val-nlp">--</div>
+    </div>
+    <div class="metric-row">
+      <div><div class="metric-label">CV Facial Score (x3, w=0.3)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-cv" style="width:0%;background:var(--sky)"></div></div></div>
+      <div class="metric-value" id="val-cv">--</div>
+    </div>
+    <div class="metric-row">
+      <div><div class="metric-label">Reaction Time Deviation (x1, w=0.2)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-rt" style="width:0%;background:var(--gold)"></div></div></div>
+      <div class="metric-value" id="val-rt">--</div>
+    </div>
+    <div class="metric-row">
+      <div><div class="metric-label">Gameplay Error Rate (x4, w=0.1)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-er" style="width:0%;background:var(--coral)"></div></div></div>
+      <div class="metric-value" id="val-er">--</div>
+    </div>
+    <div class="metric-row">
+      <div><div class="metric-label">Detected Intent (from text)</div></div>
+    <div class="metric-value" id="intentDisplay">--</div>
+</div>
+  </div>
+
+  <div class="formula-card" id="formulaCard" style="margin-top:1rem;">
+    <p style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--lilac);margin-bottom:0.6rem;">Perceptron Formula</p>
+    <div class="formula-line">Z = (<span class="formula-var">w1</span> x x1) + (<span class="formula-var">w2</span> x x2) + (<span class="formula-var">w3</span> x x3) + (<span class="formula-var">w4</span> x x4) + b</div>
+    <div class="formula-line">Z = (<span class="formula-num" id="fw1">0.2</span> x <span class="formula-num" id="fx1">--</span>) + (<span class="formula-num" id="fw2">0.4</span> x <span class="formula-num" id="fx2">--</span>) + (<span class="formula-num" id="fw3">0.3</span> x <span class="formula-num" id="fx3">--</span>) + (<span class="formula-num" id="fw4">0.1</span> x <span class="formula-num" id="fx4">--</span>) - 0.5</div>
+    <div class="formula-line">Z = <span class="formula-result" id="fz">--</span></div>
+    <div class="formula-line">f(Z) = 1 / (1 + e<sup>-Z</sup>) = <span class="formula-result" id="fscore">--</span></div>
+  </div>
+
+  <div class="game-rec" id="gameRec" style="display:none;">
+    <p style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem;">Rule-Based Deployment</p>
+    <div class="game-rec-title" id="gameName">--</div>
+    <div class="game-rec-desc" id="gameDesc">--</div>
+    <div class="game-rec-reason" id="gameReason">--</div>
+  </div>
+
+  <div style="display:flex;gap:10px;margin-top:0.5rem;">
+    <a href="/chatbot" class="btn btn-primary" style="flex:1;" id="chatBtn">Talk to AI Companion</a>
+    <a href="#" class="btn btn-ghost" id="skipGameBtn" style="flex:0 0 auto;font-size:12px;">Skip to Game</a>
+  </div>
+</div>
+
+<script>
+  const data = JSON.parse(sessionStorage.getItem('analysisResult') || '{{ data | safe }}');
+
+  const STATUS_COLORS = {
+    danger:'var(--coral)', warning:'var(--gold)', caution:'#FFD700',
+    info:'var(--sky)', success:'var(--sage)'
+  };
+
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!data || !data.score) return;
+    const pct = data.score_pct;
+    const status = data.status;
+    const nlp = data.nlp;
+    const game = data.game;
+    const formula = data.formula;
+
+    setTimeout(() => {
+      // Ring
+      const offset = 283 - (283 * pct / 100);
+      const ring = document.getElementById('ringFill');
+      ring.style.strokeDashoffset = offset;
+      ring.style.stroke = STATUS_COLORS[status.level] || 'var(--teal)';
+
+      document.getElementById('scorePct').textContent = pct + '%';
+      document.getElementById('scorePct').style.color = STATUS_COLORS[status.level];
+      document.getElementById('statusLabel').textContent = status.label;
+
+      const badge = document.getElementById('statusBadge');
+      badge.textContent = status.label;
+      badge.className = 'badge badge-' + status.level;
+
+      // Metrics
+      const nlpVal = nlp.final_score;
+      document.getElementById('val-nlp').textContent = nlpVal.toFixed(2);
+      document.getElementById('bar-nlp').style.width = (nlpVal * 100) + '%';
+
+      document.getElementById('val-cv').textContent = data.cv_score.toFixed(2);
+      document.getElementById('bar-cv').style.width = (data.cv_score * 100) + '%';
+
+      const rtNorm = Math.max(0, Math.min(1, (data.reaction_deviation + 1) / 2));
+      document.getElementById('val-rt').textContent = data.reaction_deviation.toFixed(3);
+      document.getElementById('bar-rt').style.width = (rtNorm * 100) + '%';
+
+      document.getElementById('val-er').textContent = data.error_rate.toFixed(2);
+      document.getElementById('bar-er').style.width = (data.error_rate * 100) + '%';
+
+      // Formula
+      document.getElementById('fx1').textContent = data.reaction_deviation.toFixed(3);
+      document.getElementById('fx2').textContent = nlpVal.toFixed(2);
+      document.getElementById('fx3').textContent = data.cv_score.toFixed(2);
+      document.getElementById('fx4').textContent = data.error_rate.toFixed(2);
+      document.getElementById('fz').textContent = formula.z.toFixed(4);
+      document.getElementById('fscore').textContent = data.score.toFixed(4);
+
+      // Game rec
+      document.getElementById('gameName').textContent = game.name;
+      document.getElementById('gameDesc').textContent = game.description;
+      document.getElementById('gameReason').textContent = 'Why: ' + game.reason;
+      document.getElementById('gameRec').style.display = 'block';
+
+      document.getElementById('skipGameBtn').href = '/game/' + game.type;
+
+      const intentText = data.nlp.intent || 'None (positive sentiment)';
+      document.getElementById('intentDisplay').textContent = intentText;
+
+    }, 200);
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,422 @@
+{% extends "base.html" %}
+{% set step_index = 5 %}
+{% block title %}Creative Expression{% endblock %}
+
+{% block head %}
+<style>
+  .progress-steps {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 1.5rem;
+  }
+  .prog-step {
+    flex: 1;
+    height: 4px;
+    border-radius: 99px;
+    background: var(--border);
+    transition: background 0.4s;
+  }
+  .prog-step.done    { background: var(--sage); }
+  .prog-step.current { background: var(--teal); }
+
+  .question-card {
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 1rem;
+    animation: fadeUp 0.35s ease both;
+  }
+  .q-category {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--teal);
+    margin-bottom: 0.5rem;
+  }
+  .q-text {
+    font-family: var(--font-head);
+    font-size: 18px;
+    line-height: 1.3;
+    margin-bottom: 1rem;
+  }
+
+  .options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .option-btn {
+    background: var(--navy);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.9rem 0.75rem;
+    color: var(--white);
+    font-family: var(--font-body);
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.18s;
+    text-align: left;
+    line-height: 1.4;
+  }
+  .option-btn:hover {
+    border-color: var(--teal);
+    background: rgba(46,196,182,0.07);
+  }
+  .option-btn.selected {
+    border-color: var(--teal);
+    background: rgba(46,196,182,0.15);
+    color: var(--teal);
+  }
+
+  .reflection-area {
+    margin-top: 1rem;
+    border-top: 1px solid var(--border);
+    padding-top: 1rem;
+  }
+  .reflection-label {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .reflection-input {
+    width: 100%;
+    background: var(--navy);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    color: var(--white);
+    font-size: 12px;
+    font-family: var(--font-body);
+    resize: vertical;
+  }
+  .reflection-input:focus {
+    outline: none;
+    border-color: var(--teal);
+  }
+
+  .next-btn {
+    background: var(--teal);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 10px 18px;
+    color: var(--navy);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.18s;
+    width: 100%;
+    margin-top: 0.5rem;
+  }
+  .next-btn:hover {
+    background: var(--teal-dim);
+  }
+  .next-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .insight-pill {
+    display: inline-block;
+    padding: 4px 12px;
+    border-radius: 99px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 3px;
+    background: rgba(46,196,182,0.1);
+    border: 1px solid rgba(46,196,182,0.25);
+    color: var(--teal);
+  }
+
+  .summary-card {
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.4rem;
+    margin-bottom: 1rem;
+  }
+  .mood-slider {
+    width: 100%;
+    margin: 10px 0;
+  }
+  .mood-emoji {
+    display: flex;
+    justify-content: space-between;
+    font-size: 20px;
+    margin-bottom: 5px;
+  }
+  @media (max-width: 500px) {
+    .options-grid {
+      grid-template-columns: 1fr;
+    }
+    .q-text {
+      font-size: 16px;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <p class="section-label">Activity — Creative Expression</p>
+  <h2 class="page-title" style="font-size:22px;">Express<br>Yourself</h2>
+  <p class="page-sub" style="font-size:12px;margin-top:0.3rem;">Answer prompts, then add a short reflection. No wrong answers.</p>
+
+  <div class="progress-steps" id="progressSteps"></div>
+
+  <div id="questionArea"></div>
+  <div id="summaryArea" style="display:none;animation:fadeUp 0.5s ease both;"></div>
+</div>
+
+<script>
+  // ----------------------------------------------
+  // Enhanced question set with optional mood meter for first question
+  // ----------------------------------------------
+  const QUESTIONS = [
+    {
+      category: "Mood Weather",
+      text: "If your mood were a weather pattern right now, it would be:",
+      options: ["Sunny and clear", "Partly cloudy", "Heavy rain", "A thunderstorm"],
+      insights: ["Positive energy", "Some uncertainty", "Low mood present", "Emotional turbulence"],
+      showMoodSlider: true   // special: a visual slider for this question
+    },
+    {
+      category: "Energy Colour",
+      text: "The colour that best represents your energy level today:",
+      options: ["Bright yellow", "Calm blue", "Deep grey", "Vibrant green"],
+      insights: ["High energy", "Calm and stable", "Low or depleted", "Refreshed and ready"]
+    },
+    {
+      category: "Ideal Escape",
+      text: "If you could be anywhere right now, you would choose:",
+      options: ["A quiet forest alone", "A beach with friends", "At home in bed", "A busy city full of life"],
+      insights: ["Need for solitude", "Social connection valued", "Rest and recovery needed", "Seeking stimulation"]
+    },
+    {
+      category: "Mental Load",
+      text: "Your mind right now feels like:",
+      options: ["A clear, open road", "A crowded marketplace", "A tangled ball of string", "A foggy morning"],
+      insights: ["Mental clarity", "Racing thoughts", "Cognitive overload", "Confusion or uncertainty"]
+    },
+    {
+      category: "Support Preference",
+      text: "When you feel low, what helps you most?",
+      options: ["Talking to someone", "Being alone and quiet", "Physical activity", "Creative activities"],
+      insights: ["Social support seeker", "Introvert recovery", "Physical coping", "Creative coping"]
+    },
+    {
+      category: "Self-Compassion",
+      text: "How do you usually treat yourself when you make a mistake?",
+      options: ["I forgive myself quickly", "I reflect and move on", "I blame myself for a while", "I struggle to let it go"],
+      insights: ["High self-compassion", "Healthy reflection", "Mild self-criticism", "Self-criticism noted"]
+    },
+    {
+      category: "Future View",
+      text: "When you think about next week, you feel:",
+      options: ["Optimistic and ready", "Cautiously hopeful", "Slightly worried", "Overwhelmed already"],
+      insights: ["Positive outlook", "Cautious optimism", "Anticipatory anxiety", "High future anxiety"]
+    }
+  ];
+
+  let current = 0;
+  let answers = [];        // stores { optionIdx, optionText, insight, reflectionText, moodSliderValue (optional) }
+  let moodSliderValue = 5; // default, 1-10
+
+  // Build progress dots
+  function buildProgress() {
+    const wrap = document.getElementById('progressSteps');
+    wrap.innerHTML = '';
+    QUESTIONS.forEach((_, i) => {
+      const s = document.createElement('div');
+      s.className = 'prog-step ' + (i < current ? 'done' : i === current ? 'current' : '');
+      wrap.appendChild(s);
+    });
+  }
+
+  // Render current question with optional mood slider and reflection textarea
+  function renderQuestion() {
+    if (current >= QUESTIONS.length) {
+      showSummary();
+      return;
+    }
+    buildProgress();
+    const q = QUESTIONS[current];
+    const area = document.getElementById('questionArea');
+    area.style.display = 'block';
+    let moodHtml = '';
+    if (q.showMoodSlider) {
+      moodHtml = `
+        <div class="reflection-area">
+          <div class="reflection-label">😊 How would you rate your overall mood? (1 = very low, 10 = very high)</div>
+          <div class="mood-emoji">
+            <span>😢</span><span>😐</span><span>😊</span><span>😁</span>
+          </div>
+          <input type="range" id="moodSlider" class="mood-slider" min="1" max="10" step="1" value="${moodSliderValue}">
+          <div style="text-align:center; font-size:13px; margin-top:5px;"><span id="moodValue">${moodSliderValue}</span>/10</div>
+        </div>
+      `;
+    }
+    area.innerHTML = `
+      <div class="question-card">
+        <div class="q-category">${q.category} &nbsp; ${current+1}/${QUESTIONS.length}</div>
+        <div class="q-text">${q.text}</div>
+        <div class="options-grid" id="optionsGrid">
+          ${q.options.map((opt, i) => `<button class="option-btn" data-opt-index="${i}">${opt}</button>`).join('')}
+        </div>
+        ${moodHtml}
+        <div class="reflection-area">
+          <div class="reflection-label">📝 Optional reflection (a few words)</div>
+          <textarea id="reflectionInput" class="reflection-input" rows="2" placeholder="What's on your mind? How does that choice feel?"></textarea>
+        </div>
+        <button id="nextButton" class="next-btn" disabled>Next →</button>
+      </div>
+    `;
+
+    // Add event listeners to option buttons
+    document.querySelectorAll('.option-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        // Deselect any previously selected
+        document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        // Enable next button
+        const nextBtn = document.getElementById('nextButton');
+        nextBtn.disabled = false;
+        // Store selected option index temporarily
+        window.selectedOptionIdx = parseInt(btn.dataset.optIndex);
+      });
+    });
+
+    if (q.showMoodSlider) {
+      const slider = document.getElementById('moodSlider');
+      const moodValSpan = document.getElementById('moodValue');
+      slider.addEventListener('input', (e) => {
+        moodSliderValue = parseInt(e.target.value);
+        moodValSpan.innerText = moodSliderValue;
+      });
+    }
+
+    const nextBtn = document.getElementById('nextButton');
+    nextBtn.addEventListener('click', () => {
+      const selectedIdx = window.selectedOptionIdx;
+      if (selectedIdx === undefined) return;
+      const reflection = document.getElementById('reflectionInput')?.value.trim() || '';
+      const moodVal = q.showMoodSlider ? moodSliderValue : null;
+      answers.push({
+        optionIdx: selectedIdx,
+        optionText: q.options[selectedIdx],
+        insight: q.insights[selectedIdx],
+        reflectionText: reflection,
+        moodScore: moodVal,
+        category: q.category,
+        questionText: q.text
+      });
+      current++;
+      renderQuestion();
+    });
+  }
+
+  // Final summary with enhanced insights and journal entry
+  function showSummary() {
+    document.getElementById('questionArea').style.display = 'none';
+    buildProgress();
+    const area = document.getElementById('summaryArea');
+    area.style.display = 'block';
+
+    // Compute wellness score based on insights (count negative vs positive)
+    const negativeInsights = answers.filter(a =>
+      a.insight.toLowerCase().includes('overload') ||
+      a.insight.toLowerCase().includes('anxiety') ||
+      a.insight.toLowerCase().includes('depleted') ||
+      a.insight.toLowerCase().includes('turbulence') ||
+      a.insight.toLowerCase().includes('criticism') ||
+      a.insight.toLowerCase().includes('low mood')
+    );
+    let wellnessScore = Math.round(((answers.length - negativeInsights.length) / answers.length) * 100);
+    // If there's a mood slider, incorporate it (weight 30% of total)
+    const moodAnswer = answers.find(a => a.moodScore !== null);
+    if (moodAnswer && moodAnswer.moodScore) {
+      const moodScoreNormalized = (moodAnswer.moodScore - 1) / 9 * 100; // 1→0%, 10→100%
+      wellnessScore = Math.round(wellnessScore * 0.7 + moodScoreNormalized * 0.3);
+    }
+
+    // Collect all free-text reflections for journal
+    const reflections = answers.map(a => a.reflectionText).filter(t => t !== '');
+
+    area.innerHTML = `
+      <div class="summary-card">
+        <p class="card-label">Your Expression Profile</p>
+        <p style="font-family:var(--font-head);font-size:28px;color:${wellnessScore >= 65 ? 'var(--sage)' : wellnessScore >= 40 ? 'var(--gold)' : 'var(--coral)'};">
+          ${wellnessScore}% <span style="font-size:14px;color:var(--muted);">positive indicators</span>
+        </p>
+        <p style="font-size:12px;color:var(--muted);margin-top:4px;">Based on your choices and mood rating.</p>
+      </div>
+      <div class="summary-card">
+        <p class="card-label">Emotional Insights</p>
+        <div style="margin-top:0.5rem;">
+          ${answers.map(a => `<span class="insight-pill">${a.insight}</span>`).join('')}
+        </div>
+      </div>
+      ${reflections.length > 0 ? `
+      <div class="summary-card">
+        <p class="card-label">Your Reflections (Journal)</p>
+        ${reflections.map(ref => `<div style="background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--white);">“${escapeHtml(ref)}”</div>`).join('')}
+      </div>
+      ` : ''}
+      <div class="summary-card">
+        <p class="card-label">Your Responses</p>
+        ${answers.map(a => `
+          <div style="padding:0.5rem 0;border-bottom:1px solid var(--border);">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:1px;color:var(--teal);margin-bottom:2px;">${a.category}</div>
+            <div style="font-size:12px;color:var(--muted);">${a.questionText}</div>
+            <div style="font-size:13px;color:var(--white);font-weight:600;margin-top:2px;">${a.optionText}</div>
+            ${a.reflectionText ? `<div style="font-size:11px;color:var(--muted);margin-top:4px;">✍️ ${escapeHtml(a.reflectionText)}</div>` : ''}
+          </div>`).join('')}
+      </div>
+      <div class="summary-card">
+        <p class="card-label">Suggestion for you</p>
+        <p style="font-size:13px;line-height:1.5;">${getSuggestion(wellnessScore)}</p>
+      </div>
+      <a href="/result" class="btn btn-primary btn-full">View Full Wellbeing Report</a>
+      <a href="/" class="btn btn-ghost btn-full" style="margin-top:8px;">New Check-in</a>`;
+
+    // Save to backend
+    fetch('/api/save-game-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'creative',
+        wellnessScore,
+        insights: answers.map(a => a.insight),
+        reflections: reflections,
+        answers: answers,
+        completed: true
+      })
+    });
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function getSuggestion(score) {
+    if (score >= 70) {
+      return "You're in a great emotional space. Keep nurturing your positive routines – journaling, creative hobbies, or sharing with friends.";
+    } else if (score >= 50) {
+      return "You have a balanced awareness. Consider adding one small positive habit: a 5-minute gratitude list or a nature walk.";
+    } else if (score >= 30) {
+      return "It seems you're carrying some emotional weight. Talking to someone you trust or trying a breathing exercise may help. You're not alone.";
+    } else {
+      return "Your responses indicate you might be struggling. Please consider reaching out to a mental health professional or a helpline. In the US, call 988. You deserve support.";
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    renderQuestion();
+  });
+</script>
+{% endblock %}

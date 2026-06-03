@@ -1,0 +1,250 @@
+{% extends "base.html" %}
+{% set step_index = 6 %}
+{% block title %}Your Report{% endblock %}
+
+{% block head %}
+<style>
+  .report-score-ring {
+    display: flex; flex-direction: column; align-items: center; margin: 0.5rem 0 1.25rem;
+  }
+  .ring-wrap { position: relative; width: 120px; height: 120px; }
+  .ring-svg  { transform: rotate(-90deg); }
+  .ring-bg   { fill: none; stroke: var(--navy-card); stroke-width: 8; }
+  .ring-fill {
+    fill: none; stroke-width: 8; stroke-linecap: round;
+    stroke-dasharray: 226; stroke-dashoffset: 226;
+    transition: stroke-dashoffset 1.4s ease;
+  }
+  .ring-center {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); text-align: center;
+  }
+  .ring-num   { font-family: var(--font-head); font-size: 30px; font-weight: 400; }
+  .ring-lbl   { font-size: 9px; color: var(--muted); }
+
+  .xai-block {
+    background: rgba(195,177,225,0.07); border: 1px solid rgba(195,177,225,0.2);
+    border-radius: var(--radius); padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+  }
+  .xai-label { font-size: 10px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; color: var(--lilac); margin-bottom: 0.75rem; }
+  .xai-row   { display: flex; align-items: center; gap: 10px; margin-bottom: 0.6rem; }
+  .xai-icon  { width: 28px; height: 28px; border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; font-family: var(--font-head); flex-shrink: 0; }
+  .xai-text  { flex: 1; font-size: 12px; color: var(--muted); line-height: 1.45; }
+  .xai-text strong { color: var(--white); }
+
+  .formula-mono {
+    font-family: 'Courier New', monospace; font-size: 11px; color: var(--muted);
+    background: var(--navy); border-radius: var(--radius-sm); padding: 0.85rem 1rem;
+    line-height: 2; border: 1px solid var(--border); margin-bottom: 1rem;
+  }
+  .f-var { color: var(--teal); }
+  .f-num { color: var(--gold); }
+  .f-res { color: var(--white); font-weight: 700; }
+
+  .game-result-card {
+    background: var(--navy-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 1.2rem; margin-bottom: 1rem;
+  }
+
+  .privacy-banner {
+    background: rgba(123,232,166,0.06); border: 1px solid rgba(123,232,166,0.2);
+    border-radius: var(--radius-sm); padding: 0.85rem 1rem;
+    font-size: 11px; color: var(--muted); line-height: 1.6;
+    margin-bottom: 1.25rem;
+  }
+  .privacy-banner strong { color: var(--sage); }
+
+  .action-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 0.5rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <p class="section-label">Step 4 of 4 — Final Report</p>
+  <h2 class="page-title" style="font-size:24px;">Your Wellbeing<br>Report</h2>
+
+  <div class="report-score-ring">
+    <div class="ring-wrap">
+      <svg class="ring-svg" width="120" height="120" viewBox="0 0 80 80">
+        <circle class="ring-bg" cx="40" cy="40" r="36"/>
+        <circle class="ring-fill" id="reportRing" cx="40" cy="40" r="36"/>
+      </svg>
+      <div class="ring-center">
+        <div class="ring-num" id="rScore">--</div>
+        <div class="ring-lbl">Score</div>
+      </div>
+    </div>
+    <div id="rBadge" class="badge" style="margin-top:0.6rem;">--</div>
+  </div>
+
+  <div class="privacy-banner">
+    <strong>Edge AI Privacy:</strong> All Computer Vision facial landmark analysis was processed entirely on your device. No facial images, photos, or biometric data were transmitted to any external server.
+  </div>
+
+  <div class="xai-block" id="xaiBlock">
+    <div class="xai-label">Explainable AI (XAI) Reasoning</div>
+    <div id="xaiRows"></div>
+  </div>
+
+  <div class="formula-mono" id="formulaBlock">
+    <div>Z = (0.2 x <span class="f-var">x1</span>) + (0.4 x <span class="f-var">x2</span>) + (0.3 x <span class="f-var">x3</span>) + (0.1 x <span class="f-var">x4</span>) - 0.5</div>
+    <div id="formulaValues">Loading...</div>
+    <div>Sigmoid f(Z) = <span class="f-res" id="fResult">--</span></div>
+  </div>
+
+  <div class="game-result-card" id="gameResultCard" style="display:none;">
+    <p class="card-label">Activity Completed</p>
+    <div id="gameResultContent"></div>
+  </div>
+
+  <div class="card" id="gameRecCard" style="margin-bottom:1rem;">
+    <p class="card-label">Game Deployed By Rule-Based Logic</p>
+    <p id="gameRecName" style="font-size:15px;font-weight:600;color:var(--gold);margin-bottom:0.35rem;">--</p>
+    <p id="gameRecDesc" style="font-size:12px;color:var(--muted);line-height:1.5;">--</p>
+    <p id="gameRecReason" style="font-size:11px;color:rgba(244,201,75,0.6);margin-top:0.6rem;line-height:1.5;"></p>
+  </div>
+
+  <div id="copingCard" style="display:none;" class="card" style="margin-bottom:1rem;">
+    <p class="card-label">Coping Strategy</p>
+    <p id="copingText" style="font-size:13px;color:var(--white);line-height:1.6;"></p>
+  </div>
+
+  <div class="action-grid">
+    <a href="/" class="btn btn-primary">New Check-in</a>
+    <a href="/chatbot" class="btn btn-ghost">Talk to AI</a>
+  </div>
+  <a href="/game/" id="playAgainBtn" class="btn btn-gold btn-full" style="margin-top:8px;display:none;">Play Activity Again</a>
+
+  <p style="text-align:center;font-size:11px;color:var(--muted);margin-top:1.25rem;line-height:1.6;">
+    MindBridge is a supportive tool and does not replace professional mental health care.<br>
+    If you are in distress, please speak to a counsellor or trusted adult.
+  </p>
+</div>
+
+<script>
+  const STATUS_COLORS = {
+    danger:'var(--coral)', warning:'var(--gold)', caution:'#FFD700',
+    info:'var(--sky)', success:'var(--sage)'
+  };
+
+  const rawData     = '{{ data | safe }}';
+  const rawGameData = '{{ game_data | safe }}';
+
+  const analysisData = (() => {
+    try { return JSON.parse(rawData) || JSON.parse(sessionStorage.getItem('analysisResult') || '{}'); }
+    catch { return JSON.parse(sessionStorage.getItem('analysisResult') || '{}'); }
+  })();
+  const gameData = (() => {
+    try { return JSON.parse(rawGameData) || {}; } catch { return {}; }
+  })();
+
+  window.addEventListener('DOMContentLoaded', () => {
+    if (!analysisData || !analysisData.score) return;
+
+    const score   = analysisData.score;
+    const pct     = analysisData.score_pct;
+    const status  = analysisData.status || {};
+    const nlp     = analysisData.nlp    || {};
+    const formula = analysisData.formula || {};
+    const game    = analysisData.chatbot?.game || {};
+    const chatbot = analysisData.chatbot || {};
+
+    // Ring
+    const circumference = 226;
+    const offset = circumference - (circumference * pct / 100);
+    const ring = document.getElementById('reportRing');
+    setTimeout(() => {
+      ring.style.strokeDashoffset = offset;
+      ring.style.stroke = STATUS_COLORS[status.level] || 'var(--teal)';
+    }, 200);
+
+    document.getElementById('rScore').textContent = pct + '%';
+    document.getElementById('rScore').style.color = STATUS_COLORS[status.level];
+    const badge = document.getElementById('rBadge');
+    badge.textContent = status.label || '--';
+    badge.className = 'badge badge-' + (status.level || 'info');
+
+    // XAI Rows
+    const xaiData = [
+      {
+        icon: 'NLP', color: 'rgba(46,196,182,0.18)', iconColor: 'var(--teal)',
+        text: `NLP Sentiment Score was <strong>${(nlp.final_score || 0).toFixed(2)}</strong> (weight 0.4). ` +
+              (nlp.intent ? `Detected intent: <strong>${nlp.intent}</strong>.` : 'No specific intent detected from text.')
+      },
+      {
+        icon: 'CV', color: 'rgba(168,216,234,0.18)', iconColor: 'var(--sky)',
+        text: `Computer Vision facial score was <strong>${(analysisData.cv_score || 0).toFixed(2)}</strong> (weight 0.3). ` +
+              (analysisData.cv_score > 0.65 ? 'Elevated brow tension and facial muscle activity detected.' :
+               analysisData.cv_score > 0.4  ? 'Mild facial stress indicators noted.' :
+               'Facial expression appears relaxed.')
+      },
+      {
+        icon: 'RT', color: 'rgba(244,201,75,0.18)', iconColor: 'var(--gold)',
+        text: `Reaction time deviation was <strong>${(analysisData.reaction_deviation || 0).toFixed(3)}</strong> (weight 0.2). ` +
+              ((analysisData.reaction_deviation || 0) < -0.2 ? 'Slower-than-baseline response suggests possible cognitive fatigue.' :
+               'Reaction speed within normal range.')
+      },
+      {
+        icon: 'ER', color: 'rgba(255,107,107,0.18)', iconColor: 'var(--coral)',
+        text: `Gameplay error rate was <strong>${(analysisData.error_rate || 0).toFixed(2)}</strong> (weight 0.1). ` +
+              ((analysisData.error_rate || 0) > 0.3 ? 'Above-average error rate supports elevated stress reading.' :
+               'Error rate within expected range.')
+      },
+    ];
+
+    const xaiRows = document.getElementById('xaiRows');
+    xaiData.forEach(row => {
+      xaiRows.innerHTML += `
+        <div class="xai-row">
+          <div class="xai-icon" style="background:${row.color};color:${row.iconColor};">${row.icon}</div>
+          <div class="xai-text">${row.text}</div>
+        </div>`;
+    });
+
+    // Formula
+    const rt = (analysisData.reaction_deviation || 0).toFixed(3);
+    const nl = (nlp.final_score || 0).toFixed(2);
+    const cv = (analysisData.cv_score || 0).toFixed(2);
+    const er = (analysisData.error_rate || 0).toFixed(2);
+    document.getElementById('formulaValues').innerHTML =
+      `Z = (0.2 x <span class="f-num">${rt}</span>) + (0.4 x <span class="f-num">${nl}</span>) + (0.3 x <span class="f-num">${cv}</span>) + (0.1 x <span class="f-num">${er}</span>) - 0.5 = <span class="f-res">${(formula.z || 0).toFixed(4)}</span>`;
+    document.getElementById('fResult').textContent = score.toFixed(4) + ' (' + pct + '%)';
+
+    // Game recommendation
+    if (game.name) {
+      document.getElementById('gameRecName').textContent = game.name;
+      document.getElementById('gameRecDesc').textContent = game.description || '';
+      document.getElementById('gameRecReason').textContent = 'Reason: ' + (game.reason || '');
+      const playBtn = document.getElementById('playAgainBtn');
+      playBtn.href = '/game/' + game.type;
+      playBtn.style.display = 'flex';
+    }
+
+    // Coping strategy
+    if (chatbot.coping) {
+      document.getElementById('copingCard').style.display = 'block';
+      document.getElementById('copingText').textContent = chatbot.coping;
+    }
+
+    // Game result
+    if (gameData && gameData.completed) {
+      const gc = document.getElementById('gameResultCard');
+      gc.style.display = 'block';
+      let html = '';
+      if (gameData.type === 'breathing') {
+        html = `<p style="font-size:13px;color:var(--white);">Completed <strong>${gameData.cycles || 4} cycles</strong> of box breathing.</p><p style="font-size:12px;color:var(--muted);margin-top:4px;">Parasympathetic nervous system activation achieved.</p>`;
+      } else if (gameData.type === 'focus_tap') {
+        html = `<p style="font-size:13px;color:var(--white);">Score: <strong>${gameData.score}</strong> &nbsp; Missed: <strong>${gameData.misses}</strong> &nbsp; Max streak: <strong>${gameData.maxStreak}</strong></p>`;
+      } else if (gameData.type === 'memory') {
+        html = `<p style="font-size:13px;color:var(--white);">Completed in <strong>${gameData.moves} moves</strong> and <strong>${gameData.seconds}s</strong>. Efficiency: <strong>${gameData.efficiency}%</strong></p>`;
+      } else if (gameData.type === 'creative') {
+        html = `<p style="font-size:13px;color:var(--white);">Positive indicators: <strong>${gameData.wellnessScore}%</strong></p>`;
+        if (gameData.insights) {
+          html += `<div style="margin-top:6px;">${gameData.insights.map(i => `<span style="display:inline-block;padding:3px 10px;border-radius:99px;background:rgba(46,196,182,0.1);border:1px solid rgba(46,196,182,0.2);color:var(--teal);font-size:10px;margin:2px;">${i}</span>`).join('')}</div>`;
+        }
+      }
+      document.getElementById('gameResultContent').innerHTML = html;
+    }
+  });
+</script>
+{% endblock %}

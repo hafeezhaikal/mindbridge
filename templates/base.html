@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>MindBridge - {% block title %}AI Youth Wellbeing{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,300&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy:      #1E2D3D;
+      --navy-mid:  #263547;
+      --navy-card: #2E3F52;
+      --slate:     #3A5068;
+      --teal:      #2EC4B6;
+      --teal-dim:  #1a9e93;
+      --gold:      #F4C94B;
+      --gold-dim:  #d4a82e;
+      --coral:     #FF6B6B;
+      --sky:       #A8D8EA;
+      --sage:      #7BE8A6;
+      --lilac:     #C3B1E1;
+      --white:     #F0F4F8;
+      --muted:     rgba(240,244,248,0.55);
+      --border:    rgba(240,244,248,0.12);
+      --radius:    16px;
+      --radius-sm: 10px;
+      --shadow:    0 8px 32px rgba(0,0,0,0.35);
+      --font-head: 'DM Serif Display', serif;
+      --font-body: 'DM Sans', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: var(--font-body);
+      background: var(--navy);
+      color: var(--white);
+      min-height: 100vh;
+      line-height: 1.6;
+      background-image:
+        radial-gradient(ellipse at 80% 10%, rgba(46,196,182,0.08) 0%, transparent 50%),
+        radial-gradient(ellipse at 10% 90%, rgba(244,201,75,0.06) 0%, transparent 45%);
+    }
+
+    /* Main shell: fills the entire screen, no max‑width caps */
+    .app-shell {
+      width: 100%;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+    }
+
+    /* Inner container: keeps content readable on very wide screens, but uses full width on tablets */
+    .app-container {
+      width: 100%;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 20px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Responsive container padding */
+    @media (min-width: 768px) {
+      .app-container {
+        padding: 0 40px;
+      }
+    }
+
+    @media (min-width: 1200px) {
+      .app-container {
+        padding: 0 60px;
+        max-width: 1600px;
+      }
+    }
+
+    /* Nav – transparent to let body gradient shine through */
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1.25rem 0;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: transparent;
+      backdrop-filter: blur(12px);
+    }
+
+    /* Optional subtle separator line that blends with the gradient */
+    .nav::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--teal), var(--gold), var(--teal), transparent);
+      opacity: 0.5;
+    }
+
+    .nav-brand { display: flex; align-items: center; gap: 10px; }
+    .nav-icon {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--teal);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 700; color: var(--navy);
+      font-family: var(--font-head);
+    }
+    .nav-title { font-size: 15px; font-weight: 600; color: var(--white); letter-spacing: -0.3px; }
+    .nav-sub   { font-size: 10px; color: var(--muted); }
+
+    /* Step indicator styles */
+    .step-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(0,0,0,0.2);
+      padding: 5px 12px;
+      border-radius: 99px;
+      backdrop-filter: blur(4px);
+    }
+    .step-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .step-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.2s, transform 0.2s;
+    }
+    .step-label {
+      color: var(--muted);
+      display: none;
+    }
+    .step-item.active .step-dot {
+      background: var(--teal);
+      box-shadow: 0 0 6px var(--teal);
+      transform: scale(1.2);
+    }
+    .step-item.active .step-label {
+      color: var(--white);
+    }
+    .step-item.completed .step-dot {
+      background: var(--sage);
+    }
+    .step-item.completed .step-label {
+      color: var(--sage);
+    }
+    /* Show labels on tablet and up */
+    @media (min-width: 600px) {
+      .step-label {
+        display: inline-block;
+      }
+      .step-indicator {
+        gap: 16px;
+        padding: 5px 16px;
+      }
+      .step-item {
+        gap: 8px;
+        font-size: 12px;
+      }
+    }
+
+    /* Page content */
+    .page {
+      flex: 1;
+      padding: 1.5rem 0 2.5rem;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+    }
+
+    @media (min-width: 768px) {
+      .page {
+        padding: 2rem 0 3rem;
+      }
+    }
+
+    /* Cards and elements */
+    .card {
+      background: var(--navy-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      width: 100%;
+    }
+    .card + .card { margin-top: 1.25rem; }
+    .card-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+      text-transform: uppercase; color: var(--teal); margin-bottom: 0.5rem;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      gap: 8px; padding: 12px 20px; border-radius: var(--radius-sm);
+      font-family: var(--font-body); font-size: 14px; font-weight: 600;
+      cursor: pointer; border: none; transition: all 0.18s; text-decoration: none;
+    }
+    @media (min-width: 768px) {
+      .btn {
+        padding: 14px 28px;
+        font-size: 15px;
+      }
+    }
+    .btn-primary   { background: var(--teal); color: var(--navy); }
+    .btn-primary:hover { background: var(--teal-dim); transform: translateY(-1px); }
+    .btn-gold      { background: var(--gold); color: var(--navy); }
+    .btn-gold:hover { background: var(--gold-dim); transform: translateY(-1px); }
+    .btn-ghost {
+      background: transparent; color: var(--white);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { background: rgba(255,255,255,0.07); }
+    .btn-full { width: 100%; }
+
+    /* Progress bar */
+    .progress-bar {
+      height: 4px; background: var(--border); border-radius: 99px; overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%; border-radius: 99px;
+      background: linear-gradient(90deg, var(--teal), var(--gold));
+      transition: width 0.6s ease;
+    }
+
+    /* Badges */
+    .badge {
+      display: inline-block; padding: 4px 12px; border-radius: 99px;
+      font-size: 11px; font-weight: 600; letter-spacing: 0.5px;
+    }
+    .badge-danger  { background: rgba(255,107,107,0.18); color: #FF9090; }
+    .badge-warning { background: rgba(255,179,71,0.18);  color: #FFB347; }
+    .badge-caution { background: rgba(255,215,0,0.15);   color: #FFD700; }
+    .badge-info    { background: rgba(135,206,235,0.18); color: var(--sky); }
+    .badge-success { background: rgba(123,232,166,0.18); color: var(--sage); }
+
+    /* Divider */
+    .divider { height: 1px; background: var(--border); margin: 1.25rem 0; }
+
+    /* Typography */
+    h1, h2, h3 { font-family: var(--font-head); font-weight: 400; }
+    .page-title  { font-size: 28px; line-height: 1.2; margin-bottom: 0.5rem; }
+    @media (min-width: 768px) {
+      .page-title { font-size: 34px; }
+    }
+    .page-sub    { font-size: 14px; color: var(--muted); line-height: 1.6; }
+    .section-label {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.4px;
+      text-transform: uppercase; color: var(--muted); margin-bottom: 0.75rem;
+    }
+
+    /* Animations */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp 0.5s ease both; }
+
+    /* Metric rows */
+    .metric-row {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.6rem 0; border-bottom: 1px solid var(--border);
+    }
+    .metric-row:last-child { border-bottom: none; }
+    .metric-label  { font-size: 12px; color: var(--muted); }
+    .metric-value  { font-size: 13px; font-weight: 600; color: var(--white); }
+    .metric-weight { font-size: 10px; color: var(--teal); margin-left: 6px; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body>
+<div class="app-shell">
+  <div class="app-container">
+    <nav class="nav">
+      <div class="nav-brand">
+        <div class="nav-icon">M</div>
+        <div>
+          <div class="nav-title">MindBridge</div>
+          <div class="nav-sub">AI Youth Wellbeing</div>
+        </div>
+      </div>
+      <div class="step-indicator" id="stepIndicator"></div>
+    </nav>
+    <!-- No extra divider div – the pseudo-element on .nav provides the subtle line -->
+    <div class="page">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const STEPS = [
+      { name: 'Check-in', path: '/checkin' },
+      { name: 'Face Scan', path: '/scan' },
+      { name: 'Analysis', path: '/analysis' },
+      { name: 'Chatbot', path: '/chatbot' },
+      { name: 'Game', path: '/game' }
+    ];
+
+    let currentStepIdx = -1;
+    const currentPath = window.location.pathname;
+    for (let i = 0; i < STEPS.length; i++) {
+      if (currentPath.startsWith(STEPS[i].path)) {
+        currentStepIdx = i;
+        break;
+      }
+    }
+    if (currentPath === '/result') currentStepIdx = STEPS.length;
+
+    const container = document.getElementById('stepIndicator');
+    if (!container) return;
+
+    container.innerHTML = '';
+    for (let i = 0; i < STEPS.length; i++) {
+      const step = STEPS[i];
+      const isActive = (i === currentStepIdx);
+      const isCompleted = (currentStepIdx > i) || (currentPath === '/result');
+      const item = document.createElement('div');
+      item.className = `step-item ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''}`;
+      item.innerHTML = `
+        <div class="step-dot"></div>
+        <span class="step-label">${step.name}</span>
+      `;
+      if (isCompleted && !isActive && currentPath !== '/result') {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => {
+          window.location.href = step.path;
+        });
+        item.title = `Go to ${step.name}`;
+      }
+      container.appendChild(item);
+      if (i < STEPS.length - 1) {
+        const sep = document.createElement('span');
+        sep.textContent = '→';
+        sep.style.color = 'var(--muted)';
+        sep.style.fontSize = '15px';
+        sep.style.margin = '0 2px';
+        container.appendChild(sep);
+      }
+    }
+  })();
+</script>
+</body>
+</html>

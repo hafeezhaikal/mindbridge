@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% set step_index = 0 %}
+{% block title %}Welcome{% endblock %}
+
+{% block head %}
+<style>
+  .hero { text-align: center; padding: 2rem 0 1.5rem; }
+  .hero-icon {
+    width: 80px; height: 80px; border-radius: 50%;
+    background: var(--teal); color: var(--navy);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--font-head); font-size: 32px; font-weight: 700;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 0 0 16px rgba(46,196,182,0.12), 0 0 0 32px rgba(46,196,182,0.05);
+  }
+  .hero h1 { font-size: 32px; line-height: 1.15; margin-bottom: 0.75rem; }
+  .hero h1 span { color: var(--teal); }
+  .hero p { color: var(--muted); font-size: 14px; max-width: 320px; margin: 0 auto 2rem; }
+
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1.75rem; }
+  .feature-card {
+    background: var(--navy-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1rem;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .feature-icon {
+    width: 32px; height: 32px; border-radius: var(--radius-sm);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; font-weight: 700; font-family: var(--font-head);
+  }
+  .fi-nlp   { background: rgba(46,196,182,0.18); color: var(--teal); }
+  .fi-cv    { background: rgba(168,216,234,0.18); color: var(--sky); }
+  .fi-game  { background: rgba(244,201,75,0.18);  color: var(--gold); }
+  .fi-bot   { background: rgba(195,177,225,0.18); color: var(--lilac); }
+  .feature-title { font-size: 12px; font-weight: 600; color: var(--white); }
+  .feature-desc  { font-size: 11px; color: var(--muted); line-height: 1.4; }
+
+  .nhms-banner {
+    background: rgba(46,196,182,0.08); border: 1px solid rgba(46,196,182,0.25);
+    border-radius: var(--radius-sm); padding: 0.85rem 1rem;
+    margin-bottom: 1.5rem;
+    display: flex; gap: 10px; align-items: flex-start;
+  }
+  .nhms-bar { width: 3px; min-height: 36px; background: var(--teal); border-radius: 2px; flex-shrink: 0; }
+  .nhms-text { font-size: 11px; color: var(--muted); line-height: 1.5; }
+  .nhms-text strong { color: var(--white); }
+
+  .flow-row {
+    display: flex; align-items: center; gap: 6px;
+    margin-bottom: 1.5rem; justify-content: center; flex-wrap: wrap;
+  }
+  .flow-step {
+    font-size: 10px; font-weight: 600; padding: 5px 10px;
+    border: 1px solid var(--border); border-radius: 99px; color: var(--muted);
+    white-space: nowrap;
+  }
+  .flow-step.active-step { border-color: var(--teal); color: var(--teal); }
+  .flow-arrow { color: var(--muted); font-size: 12px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <div class="hero">
+    <div class="hero-icon">M</div>
+    <h1>AI-Powered<br><span>Youth Wellbeing</span></h1>
+    <p>Gamified mental health support combining NLP, Computer Vision, and adaptive mini-games to understand and support how you feel.</p>
+  </div>
+
+  <div class="nhms-banner fade-up fade-up-d1">
+    <div class="nhms-bar"></div>
+    <div class="nhms-text">
+      <strong>NHMS 2023:</strong> Mental health issues among Malaysian children and adolescents have <strong>doubled since 2019</strong>. Social desirability bias causes many youths to underreport their true emotional state on traditional surveys.
+    </div>
+  </div>
+
+  <div class="feature-grid fade-up fade-up-d1">
+    <div class="feature-card">
+      <div class="feature-icon fi-nlp">NLP</div>
+      <div class="feature-title">Sentiment Analysis</div>
+      <div class="feature-desc">Maps your words to an emotional score from -1.0 to +1.0 with intent detection.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon fi-cv">CV</div>
+      <div class="feature-title">Face Analysis</div>
+      <div class="feature-desc">Detects facial landmarks, brow tension and lip movement via your camera.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon fi-game">G</div>
+      <div class="feature-title">Adaptive Games</div>
+      <div class="feature-desc">Four mini-games deployed by rule-based AI based on your Sigmoid score.</div>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon fi-bot">AI</div>
+      <div class="feature-title">AI Chatbot</div>
+      <div class="feature-desc">Conversational support with coping strategies tailored to your profile.</div>
+    </div>
+  </div>
+
+  <p class="section-label fade-up fade-up-d2">System Flow</p>
+  <div class="flow-row fade-up fade-up-d2">
+    <div class="flow-step active-step">Check-in</div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-step">Face Scan</div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-step">AI Analysis</div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-step">Chatbot</div>
+    <div class="flow-arrow">&#8594;</div>
+    <div class="flow-step">Game</div>
+  </div>
+
+  <div class="fade-up fade-up-d3">
+    <a href="/checkin" class="btn btn-primary btn-full" style="font-size:15px; padding:15px;">
+      Start Wellbeing Check-in
+    </a>
+    <p style="text-align:center; font-size:11px; color:var(--muted); margin-top:0.85rem;">
+      No facial data is stored. Edge AI privacy by design.
+    </p>
+  </div>
+</div>
+{% endblock %}

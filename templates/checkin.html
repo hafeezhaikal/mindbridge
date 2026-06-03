@@ -1,0 +1,235 @@
+{% extends "base.html" %}
+{% set step_index = 1 %}
+{% block title %}Emotional Check-in{% endblock %}
+
+{% block head %}
+<style>
+  .emotion-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 1.5rem; }
+  .emotion-btn {
+    background: var(--navy-card); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 1rem 0.75rem;
+    cursor: pointer; transition: all 0.18s; text-align: center;
+    display: flex; flex-direction: column; gap: 6px; align-items: center;
+  }
+  .emotion-btn:hover { border-color: var(--teal); background: rgba(46,196,182,0.07); }
+  .emotion-btn.selected { border-color: var(--teal); background: rgba(46,196,182,0.14); }
+  .emotion-btn.selected .e-label { color: var(--teal); }
+  .e-icon  { font-size: 22px; letter-spacing: 0; }
+  .e-label { font-size: 12px; font-weight: 600; color: var(--white); }
+  .e-score { font-size: 10px; color: var(--muted); }
+
+  textarea {
+    width: 100%; background: var(--navy-card); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); color: var(--white); padding: 12px 14px;
+    font-family: var(--font-body); font-size: 13px; resize: none; outline: none;
+    transition: border-color 0.2s; line-height: 1.6;
+  }
+  textarea:focus { border-color: var(--teal); }
+  textarea::placeholder { color: var(--muted); }
+
+  .intent-tag {
+    display: none; margin-top: 8px;
+    background: rgba(46,196,182,0.1); border: 1px solid rgba(46,196,182,0.3);
+    border-radius: var(--radius-sm); padding: 8px 12px;
+    font-size: 12px; color: var(--teal);
+  }
+  .intent-tag.visible { display: block; animation: fadeUp 0.3s ease both; }
+
+  .reaction-box {
+    background: var(--navy-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 1.1rem 1.2rem; margin-bottom: 1rem;
+  }
+  .reaction-prompt { font-size: 13px; color: var(--muted); margin-bottom: 0.75rem; }
+  #reactionBtn {
+    width: 100%; padding: 13px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--gold); background: transparent; color: var(--gold);
+    font-family: var(--font-body); font-size: 13px; font-weight: 600;
+    cursor: pointer; transition: all 0.18s;
+  }
+  #reactionBtn:hover { background: rgba(244,201,75,0.1); }
+  #reactionBtn.waiting { border-color: var(--coral); color: var(--coral); }
+  #reactionBtn.done { border-color: var(--sage); color: var(--sage); }
+  .reaction-result { font-size: 12px; color: var(--muted); margin-top: 6px; text-align: center; }
+
+  .nlp-preview {
+    background: rgba(168,216,234,0.07); border: 1px solid rgba(168,216,234,0.2);
+    border-radius: var(--radius-sm); padding: 0.9rem 1rem; margin-bottom: 1rem;
+  }
+  .nlp-bar-wrap { height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; margin-top: 6px; }
+  .nlp-bar-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, var(--coral), var(--gold), var(--sage)); transition: width 0.6s ease; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <div style="margin-bottom:1.5rem;">
+    <p class="section-label">Step 1 of 4</p>
+    <h2 class="page-title" style="font-size:24px;">How are you feeling<br>today?</h2>
+    <p class="page-sub" style="margin-top:0.4rem; font-size:13px;">Your responses are processed privately on-device.</p>
+  </div>
+
+  <p class="section-label">Select your current emotion</p>
+  <div class="emotion-grid">
+    {% set emotions = [
+      ("happy",      "H",  "Happy",       "Positive"),
+      ("excited",    "E",  "Excited",     "Energised"),
+      ("calm",       "C",  "Calm",        "Settled"),
+      ("okay",       "O",  "Okay",        "Neutral"),
+      ("tired",      "Ti", "Tired",       "Low energy"),
+      ("sad",        "S",  "Sad",         "Low mood"),
+      ("anxious",    "An", "Anxious",     "Worried"),
+      ("stressed",   "St", "Stressed",    "Overwhelmed"),
+      ("angry",      "Ag", "Angry",       "Frustrated"),
+      ("lonely",     "L",  "Lonely",      "Disconnected"),
+      ("confused",   "Cf", "Confused",    "Uncertain"),
+      ("hopeless",   "Ho", "Hopeless",    "Stuck")
+    ] %}
+    {% for key, abbr, label, desc in emotions %}
+    <div class="emotion-btn" data-emotion="{{ key }}" onclick="selectEmotion(this, '{{ key }}')">
+      <div class="e-icon" style="width:32px;height:32px;border-radius:50%;background:var(--slate);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:var(--font-head);color:var(--white);">{{ abbr }}</div>
+      <div class="e-label">{{ label }}</div>
+      <div class="e-score">{{ desc }}</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  <p class="section-label">Or describe in your own words</p>
+  <textarea id="freeText" rows="3" placeholder='e.g. "I feel completely overwhelmed by my university assignments..."' oninput="analyseText(this.value)"></textarea>
+  <div class="intent-tag" id="intentTag"></div>
+
+  <div class="divider"></div>
+
+  <div class="nlp-preview" id="nlpPreview" style="display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--sky);">NLP Sentiment Score</span>
+      <span id="nlpScoreLabel" style="font-size:13px;font-weight:600;color:var(--white);">--</span>
+    </div>
+    <div class="nlp-bar-wrap"><div class="nlp-bar-fill" id="nlpBar" style="width:50%;"></div></div>
+    <div style="display:flex;justify-content:space-between;margin-top:4px;">
+      <span style="font-size:10px;color:var(--coral);">Negative</span>
+      <span style="font-size:10px;color:var(--sage);">Positive</span>
+    </div>
+  </div>
+
+  <div class="reaction-box fade-up fade-up-d1">
+    <p class="reaction-prompt">Reaction Time Measurement <span style="font-size:10px;font-weight:600;letter-spacing:0.5px;color:var(--teal);">x1 input</span></p>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:0.75rem;">Wait for the button to turn gold, then tap it as fast as you can.</p>
+    <button id="reactionBtn" onclick="handleReaction()">Press and hold to start</button>
+    <p class="reaction-result" id="reactionResult"></p>
+  </div>
+
+  <button class="btn btn-primary btn-full" id="submitBtn" onclick="submitCheckin()" disabled style="margin-top:0.5rem;">
+    Continue to Face Scan
+  </button>
+  <p style="font-size:11px;color:var(--muted);text-align:center;margin-top:0.75rem;">Select an emotion to continue</p>
+</div>
+
+<script>
+  const EMOTION_SCORES = {
+    happy:0.90, excited:0.85, calm:0.75, okay:0.60, neutral:0.50,
+    tired:0.35, confused:0.30, bored:0.28, lonely:0.22, sad:0.18,
+    anxious:0.15, angry:0.12, stressed:0.10, hopeless:0.05
+  };
+  const KEYWORDS = {
+    assignment:"Academic Burnout", exam:"Academic Pressure", study:"Academic Pressure",
+    fail:"Academic Fear", university:"Academic Burnout", school:"Academic Pressure",
+    tired:"Physical Fatigue", sleep:"Sleep Deprivation", lonely:"Social Isolation",
+    friend:"Social Concern", family:"Family Stress", money:"Financial Anxiety",
+    job:"Career Anxiety", future:"Future Uncertainty", hopeless:"Depressive Ideation",
+    useless:"Low Self-Worth", angry:"Emotional Dysregulation", panic:"Acute Anxiety",
+    worthless:"Low Self-Worth", overwhelm:"Cognitive Overload", deadline:"Academic Pressure"
+  };
+
+  let selectedEmotion = null;
+  let reactionTimeMs = null;
+  let reactionState = "idle";
+  let reactionTimer = null;
+  let reactionStart = null;
+
+  function selectEmotion(el, key) {
+    document.querySelectorAll('.emotion-btn').forEach(b => b.classList.remove('selected'));
+    el.classList.add('selected');
+    selectedEmotion = key;
+    checkReady();
+    const score = EMOTION_SCORES[key] || 0.5;
+    document.getElementById('nlpPreview').style.display = 'block';
+    document.getElementById('nlpScoreLabel').textContent = score.toFixed(2);
+    document.getElementById('nlpBar').style.width = (score * 100) + '%';
+  }
+
+  function analyseText(text) {
+    const tag = document.getElementById('intentTag');
+    if (!text.trim()) { tag.classList.remove('visible'); return; }
+    const lower = text.toLowerCase();
+    let intent = null;
+    for (const [kw, label] of Object.entries(KEYWORDS)) {
+      if (lower.includes(kw)) { intent = label; break; }
+    }
+    if (intent) {
+      tag.textContent = 'NLP Intent detected: ' + intent;
+      tag.classList.add('visible');
+    } else {
+      tag.classList.remove('visible');
+    }
+    document.getElementById('nlpPreview').style.display = 'block';
+    const negWords = ["bad","worse","terrible","awful","horrible","tired","stressed","anxious","sad","angry","overwhelm","hopeless","fail","lonely","lost","panic","worthless","useless"];
+    const posWords = ["happy","good","great","fine","okay","well","better","excited","calm","peaceful"];
+    const negCount = negWords.filter(w => lower.includes(w)).length;
+    const posCount = posWords.filter(w => lower.includes(w)).length;
+    const total = negCount + posCount || 1;
+    const score = Math.max(0.05, Math.min(0.95, posCount / total));
+    document.getElementById('nlpScoreLabel').textContent = score.toFixed(2);
+    document.getElementById('nlpBar').style.width = (score * 100) + '%';
+  }
+
+  function handleReaction() {
+    const btn = document.getElementById('reactionBtn');
+    if (reactionState === 'idle') {
+      reactionState = 'holding';
+      btn.textContent = 'Waiting...';
+      btn.classList.add('waiting');
+      const delay = 1500 + Math.random() * 2500;
+      reactionTimer = setTimeout(() => {
+        btn.textContent = 'TAP NOW!';
+        btn.style.background = 'var(--gold)';
+        btn.style.color = 'var(--navy)';
+        reactionStart = Date.now();
+        reactionState = 'ready';
+      }, delay);
+    } else if (reactionState === 'holding') {
+      clearTimeout(reactionTimer);
+      reactionState = 'idle';
+      btn.textContent = 'Press and hold to start';
+      btn.classList.remove('waiting');
+    } else if (reactionState === 'ready') {
+      reactionTimeMs = Date.now() - reactionStart;
+      reactionState = 'done';
+      btn.textContent = 'Great! ' + reactionTimeMs + 'ms';
+      btn.classList.remove('waiting');
+      btn.classList.add('done');
+      btn.style.background = '';
+      btn.style.color = '';
+      document.getElementById('reactionResult').textContent = reactionTimeMs < 350 ? 'Excellent reaction time!' : reactionTimeMs < 600 ? 'Normal reaction time.' : 'Slightly slow - this may indicate fatigue.';
+      checkReady();
+    }
+  }
+
+  function checkReady() {
+    const ready = selectedEmotion && reactionTimeMs !== null;
+    document.getElementById('submitBtn').disabled = !ready;
+  }
+
+  function submitCheckin() {
+    const freeText = document.getElementById('freeText').value;
+    const payload = {
+      emotion: selectedEmotion,
+      free_text: freeText,
+      reaction_time_ms: reactionTimeMs || 500,
+      cv_score: null,
+      error_rate: null
+    };
+    sessionStorage.setItem('checkinPayload', JSON.stringify(payload));
+    window.location.href = '/scan';
+  }
+</script>
+{% endblock %}

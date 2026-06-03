@@ -1,0 +1,570 @@
+{% extends "base.html" %}
+{% set step_index = 5 %}
+{% block title %}Breathing Exercise{% endblock %}
+
+{% block head %}
+<style>
+  .breathing-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    padding: 1rem 0 2rem;
+  }
+  .controls-card {
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem 1.2rem;
+    margin-bottom: 1.25rem;
+    width: 100%;
+  }
+  .slider-group {
+    margin-bottom: 0.8rem;
+  }
+  .slider-group label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 0.3rem;
+  }
+  input[type="range"] {
+    width: 100%;
+    background: var(--slate);
+    height: 3px;
+    border-radius: 3px;
+    -webkit-appearance: none;
+  }
+  input[type="range"]:focus {
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--teal);
+    cursor: pointer;
+  }
+  .duration-value {
+    color: var(--teal);
+    font-weight: 600;
+  }
+  .button-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+  .action-btn {
+    flex: 1;
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: var(--radius-sm);
+    border: none;
+    background: var(--navy-mid);
+    color: var(--white);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .action-btn.primary {
+    background: var(--teal);
+    color: var(--navy);
+  }
+  .action-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+  }
+  .action-btn:disabled {
+    opacity: 0.5;
+    transform: none;
+    cursor: not-allowed;
+  }
+
+  .phase-indicators {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 1.5rem;
+  }
+  .phase-ind {
+    text-align: center;
+    opacity: 0.4;
+    transition: opacity 0.3s;
+  }
+  .phase-ind.active {
+    opacity: 1;
+  }
+  .phase-ind-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--white);
+    margin-bottom: 2px;
+  }
+  .phase-ind-dur {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .phase-ind-bar {
+    width: 40px;
+    height: 3px;
+    border-radius: 99px;
+    background: var(--border);
+    margin-top: 5px;
+  }
+  .phase-ind.inhale.active .phase-ind-bar { background: var(--teal); }
+  .phase-ind.hold.active .phase-ind-bar   { background: var(--sky); }
+  .phase-ind.exhale.active .phase-ind-bar { background: var(--lilac); }
+
+  .breath-ring-outer {
+    position: relative;
+    width: 220px;
+    height: 220px;
+    margin: 1rem auto;
+  }
+  .breath-circle {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 6px;
+    background: rgba(46,196,182,0.05);
+    border: 2px solid rgba(46,196,182,0.3);
+    transition: transform 0.2s ease-in-out, background 0.3s, border-color 0.3s;
+    will-change: transform;
+  }
+  .breath-phase {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--white);
+    letter-spacing: 0.5px;
+  }
+  .breath-count {
+    font-family: var(--font-head);
+    font-size: 44px;
+    color: var(--teal);
+  }
+  .cycle-pips {
+    margin: 1rem 0;
+  }
+  .cycle-pip {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--border);
+    display: inline-block;
+    margin: 0 4px;
+    transition: background 0.2s;
+  }
+  .cycle-pip.completed { background: var(--sage); }
+  .cycle-pip.active    { background: var(--teal); transform: scale(1.2); }
+
+  .complete-overlay {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 2rem 1rem;
+    animation: fadeUp 0.5s ease;
+  }
+  .complete-overlay.show {
+    display: flex;
+  }
+  .message-area {
+    margin-top: 1rem;
+    font-size: 13px;
+    color: var(--muted);
+    text-align: center;
+  }
+  .countdown-prep {
+    font-size: 28px;
+    font-weight: bold;
+    color: var(--gold);
+    margin-bottom: 1rem;
+  }
+  @media (max-width: 500px) {
+    .breath-ring-outer { width: 180px; height: 180px; }
+    .breath-count { font-size: 36px; }
+    .phase-ind-label { font-size: 12px; }
+    .action-btn { font-size: 12px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <p class="section-label">Activity — Stress Relief</p>
+  <h2 class="page-title" style="font-size:22px;">Guided Box Breathing</h2>
+  <p class="page-sub" style="font-size:12px; margin-top:0.3rem;">Square breathing to calm your nervous system. Adjust durations to your comfort.</p>
+
+  <!-- Control panel (duration sliders) -->
+  <div class="controls-card">
+    <div class="slider-group">
+      <label><span>Inhale</span><span class="duration-value" id="inhaleDurValue">4</span> sec</label>
+      <input type="range" id="inhaleSlider" min="2" max="8" step="1" value="4">
+    </div>
+    <div class="slider-group">
+      <label><span>Hold</span><span class="duration-value" id="holdDurValue">4</span> sec</label>
+      <input type="range" id="holdSlider" min="2" max="8" step="1" value="4">
+    </div>
+    <div class="slider-group">
+      <label><span>Exhale</span><span class="duration-value" id="exhaleDurValue">4</span> sec</label>
+      <input type="range" id="exhaleSlider" min="2" max="8" step="1" value="4">
+    </div>
+    <div class="button-row">
+      <button id="startBtn" class="action-btn primary">▶ Start</button>
+      <button id="pauseBtn" class="action-btn" disabled>⏸ Pause</button>
+      <button id="resetBtn" class="action-btn">⟳ Reset</button>
+    </div>
+  </div>
+
+  <div id="exerciseArea">
+    <!-- Phase indicators -->
+    <div class="phase-indicators" id="phaseIndicators">
+      <div class="phase-ind inhale" id="phaseInhale">
+        <div class="phase-ind-label">Inhale</div>
+        <div class="phase-ind-dur" id="inhaleDurDisplay">4 s</div>
+        <div class="phase-ind-bar"></div>
+      </div>
+      <div class="phase-ind hold" id="phaseHold">
+        <div class="phase-ind-label">Hold</div>
+        <div class="phase-ind-dur" id="holdDurDisplay">4 s</div>
+        <div class="phase-ind-bar"></div>
+      </div>
+      <div class="phase-ind exhale" id="phaseExhale">
+        <div class="phase-ind-label">Exhale</div>
+        <div class="phase-ind-dur" id="exhaleDurDisplay">4 s</div>
+        <div class="phase-ind-bar"></div>
+      </div>
+    </div>
+
+    <div class="breath-ring-outer">
+      <div class="breath-circle" id="breathCircle">
+        <span class="breath-phase" id="phaseText">Ready</span>
+        <span class="breath-count" id="countText">—</span>
+      </div>
+    </div>
+
+    <div class="cycle-pips" id="cyclePips"></div>
+    <div class="message-area" id="messageArea">Adjust durations and press Start.</div>
+  </div>
+
+  <div class="complete-overlay" id="completeSection">
+    <div style="width:64px;height:64px;border-radius:50%;background:rgba(123,232,166,0.2);border:2px solid var(--sage);display:flex;align-items:center;justify-content:center;margin-bottom:1.25rem;">
+      <span style="color:var(--sage);font-size:14px;font-weight:700;">✓</span>
+    </div>
+    <h3 style="font-family:var(--font-head);font-size:22px;margin-bottom:0.5rem;">Exercise Complete</h3>
+    <p style="color:var(--muted);font-size:13px;line-height:1.6;max-width:280px;margin-bottom:1.5rem;">Box breathing lowers cortisol and activates the vagus nerve. You've taken a great step for your mental wellbeing.</p>
+    <a href="/result" class="btn btn-primary btn-full">View My Full Report</a>
+    <a href="/" class="btn btn-ghost btn-full" style="margin-top:8px;">Start New Check-in</a>
+  </div>
+</div>
+
+<script>
+  // DOM elements
+  const startBtn = document.getElementById('startBtn');
+  const pauseBtn = document.getElementById('pauseBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const inhaleSlider = document.getElementById('inhaleSlider');
+  const holdSlider = document.getElementById('holdSlider');
+  const exhaleSlider = document.getElementById('exhaleSlider');
+  const inhaleDurVal = document.getElementById('inhaleDurValue');
+  const holdDurVal = document.getElementById('holdDurValue');
+  const exhaleDurVal = document.getElementById('exhaleDurValue');
+  const inhaleDurDisplay = document.getElementById('inhaleDurDisplay');
+  const holdDurDisplay = document.getElementById('holdDurDisplay');
+  const exhaleDurDisplay = document.getElementById('exhaleDurDisplay');
+  const phaseTextSpan = document.getElementById('phaseText');
+  const countTextSpan = document.getElementById('countText');
+  const breathCircle = document.getElementById('breathCircle');
+  const messageArea = document.getElementById('messageArea');
+  const exerciseArea = document.getElementById('exerciseArea');
+  const completeSection = document.getElementById('completeSection');
+  const cyclePipsDiv = document.getElementById('cyclePips');
+
+  // State variables
+  let durations = { inhale: 4, hold: 4, exhale: 4 };
+  let phases = ['inhale', 'hold', 'exhale'];
+  let phaseLabels = ['Inhale', 'Hold', 'Exhale'];
+  let totalCycles = 4;
+  let currentCycle = 0;
+  let currentPhaseIdx = 0;
+  let currentCountdown = 0; // seconds left in current phase
+  let timer = null;
+  let isRunning = false;
+  let isPaused = false;
+  let isPreparing = false;    // countdown before start
+  let vibrationSupported = 'vibrate' in navigator;
+
+  // Helper: vibrate if supported
+  function vibrate(pattern) {
+    if (vibrationSupported && isRunning && !isPaused) {
+      navigator.vibrate(pattern);
+    }
+  }
+
+  // Update duration displays from sliders
+  function updateDurations() {
+    durations.inhale = parseInt(inhaleSlider.value);
+    durations.hold = parseInt(holdSlider.value);
+    durations.exhale = parseInt(exhaleSlider.value);
+    inhaleDurVal.innerText = durations.inhale;
+    holdDurVal.innerText = durations.hold;
+    exhaleDurVal.innerText = durations.exhale;
+    inhaleDurDisplay.innerText = durations.inhale + ' s';
+    holdDurDisplay.innerText = durations.hold + ' s';
+    exhaleDurDisplay.innerText = durations.exhale + ' s';
+    // If not running, reset the countdown to the new phase duration
+    if (!isRunning && !isPreparing) {
+      currentCountdown = durations[phases[currentPhaseIdx]];
+      updateUI();
+    }
+  }
+
+  // Update visual elements (circle, phase indicators, countdown, pips)
+  function updateUI() {
+    // Update phase indicator active class
+    document.querySelectorAll('.phase-ind').forEach((el, idx) => {
+      if (idx === currentPhaseIdx) el.classList.add('active');
+      else el.classList.remove('active');
+    });
+    // Phase text and countdown number
+    phaseTextSpan.innerText = phaseLabels[currentPhaseIdx];
+    countTextSpan.innerText = currentCountdown;
+    // Update circle scaling based on phase (inhale → scale up, exhale → scale down)
+    let scale = 1;
+    let borderColor = '';
+    let bgColor = '';
+    if (phases[currentPhaseIdx] === 'inhale') {
+      const maxScale = 1.35;
+      const progress = (durations.inhale - currentCountdown) / durations.inhale;
+      scale = 1 + progress * (maxScale - 1);
+      borderColor = 'var(--teal)';
+      bgColor = 'rgba(46,196,182,0.12)';
+    } else if (phases[currentPhaseIdx] === 'hold') {
+      scale = 1.35;
+      borderColor = 'var(--sky)';
+      bgColor = 'rgba(168,216,234,0.12)';
+    } else { // exhale
+      const maxScale = 1.35;
+      const progress = (durations.exhale - currentCountdown) / durations.exhale;
+      scale = 1 + (maxScale - 1) * (1 - progress); // decreasing scale
+      borderColor = 'rgba(46,196,182,0.4)';
+      bgColor = 'rgba(46,196,182,0.05)';
+    }
+    breathCircle.style.transform = `scale(${scale})`;
+    breathCircle.style.borderColor = borderColor;
+    breathCircle.style.background = bgColor;
+    // Update cycle pips
+    const pips = document.querySelectorAll('.cycle-pip');
+    for (let i = 0; i < totalCycles; i++) {
+      if (i < currentCycle) pips[i].classList.add('completed');
+      else pips[i].classList.remove('completed');
+      if (i === currentCycle) pips[i].classList.add('active');
+      else pips[i].classList.remove('active');
+    }
+  }
+
+  // Advance to next phase or cycle
+  function nextPhase() {
+    currentPhaseIdx++;
+    if (currentPhaseIdx >= phases.length) {
+      // Finished one full cycle
+      currentPhaseIdx = 0;
+      currentCycle++;
+      if (currentCycle >= totalCycles) {
+        // Exercise completed
+        stopTimer();
+        finishExercise();
+        return;
+      }
+    }
+    currentCountdown = durations[phases[currentPhaseIdx]];
+    updateUI();
+    // Vibration on phase change (short pulse)
+    vibrate(50);
+  }
+
+  // Timer tick (called every second)
+  function tick() {
+    if (!isRunning || isPaused) return;
+    if (currentCountdown <= 1) {
+      // Move to next phase
+      nextPhase();
+    } else {
+      currentCountdown--;
+      updateUI();
+      // Optional vibration on each second? maybe too much. We skip.
+    }
+  }
+
+  // Start the preparation countdown (3,2,1) before actual breathing
+  function startPreparation() {
+    if (timer) clearInterval(timer);
+    isRunning = false;
+    isPaused = false;
+    isPreparing = true;
+    let prepCount = 3;
+    phaseTextSpan.innerText = 'Get ready';
+    countTextSpan.innerText = prepCount;
+    breathCircle.style.transform = 'scale(1)';
+    messageArea.innerText = `Starting in ${prepCount}...`;
+    const prepTimer = setInterval(() => {
+      prepCount--;
+      if (prepCount >= 1) {
+        phaseTextSpan.innerText = 'Get ready';
+        countTextSpan.innerText = prepCount;
+        messageArea.innerText = `Starting in ${prepCount}...`;
+        vibrate(30);
+      } else {
+        clearInterval(prepTimer);
+        isPreparing = false;
+        // Actually start the exercise
+        startExercise();
+      }
+    }, 1000);
+    window.prepTimer = prepTimer;
+  }
+
+  function startExercise() {
+    if (timer) clearInterval(timer);
+    // Reset state to cycle 0, phase 0
+    currentCycle = 0;
+    currentPhaseIdx = 0;
+    currentCountdown = durations[phases[0]];
+    isRunning = true;
+    isPaused = false;
+    startBtn.disabled = true;
+    pauseBtn.disabled = false;
+    resetBtn.disabled = false;
+    // Disable sliders while running
+    inhaleSlider.disabled = true;
+    holdSlider.disabled = true;
+    exhaleSlider.disabled = true;
+    // Build cycle pips
+    cyclePipsDiv.innerHTML = '';
+    for (let i = 0; i < totalCycles; i++) {
+      const pip = document.createElement('div');
+      pip.className = 'cycle-pip';
+      if (i === 0) pip.classList.add('active');
+      cyclePipsDiv.appendChild(pip);
+    }
+    updateUI();
+    messageArea.innerText = 'Follow the circle. Inhale → Hold → Exhale.';
+    timer = setInterval(tick, 1000);
+    vibrate(100);
+  }
+
+  function pauseExercise() {
+    if (!isRunning || isPaused) return;
+    isPaused = true;
+    clearInterval(timer);
+    timer = null;
+    pauseBtn.innerText = '▶ Resume';
+    startBtn.disabled = true;
+    messageArea.innerText = 'Paused. Press Resume to continue.';
+    vibrate(50);
+  }
+
+  function resumeExercise() {
+    if (!isRunning || !isPaused) return;
+    isPaused = false;
+    timer = setInterval(tick, 1000);
+    pauseBtn.innerText = '⏸ Pause';
+    messageArea.innerText = 'Follow the circle. Inhale → Hold → Exhale.';
+    vibrate(50);
+  }
+
+  function resetExercise() {
+    // Stop everything
+    if (timer) clearInterval(timer);
+    if (window.prepTimer) clearInterval(window.prepTimer);
+    isRunning = false;
+    isPaused = false;
+    isPreparing = false;
+    startBtn.disabled = false;
+    pauseBtn.disabled = true;
+    pauseBtn.innerText = '⏸ Pause';
+    resetBtn.disabled = false;
+    // Re-enable sliders
+    inhaleSlider.disabled = false;
+    holdSlider.disabled = false;
+    exhaleSlider.disabled = false;
+    // Reset UI to idle
+    currentCycle = 0;
+    currentPhaseIdx = 0;
+    currentCountdown = durations[phases[0]];
+    phaseTextSpan.innerText = 'Ready';
+    countTextSpan.innerText = '—';
+    breathCircle.style.transform = 'scale(1)';
+    breathCircle.style.borderColor = 'rgba(46,196,182,0.3)';
+    breathCircle.style.background = 'rgba(46,196,182,0.05)';
+    messageArea.innerText = 'Adjust durations and press Start.';
+    // Clear cycle pips
+    cyclePipsDiv.innerHTML = '';
+    // Reset phase indicators
+    document.querySelectorAll('.phase-ind').forEach((el, idx) => {
+      if (idx === 0) el.classList.add('active');
+      else el.classList.remove('active');
+    });
+    // Hide complete overlay if visible
+    completeSection.classList.remove('show');
+    exerciseArea.style.display = 'block';
+  }
+
+  function finishExercise() {
+    isRunning = false;
+    if (timer) clearInterval(timer);
+    startBtn.disabled = true;
+    pauseBtn.disabled = true;
+    resetBtn.disabled = false;
+    // Show completion overlay
+    exerciseArea.style.display = 'none';
+    completeSection.classList.add('show');
+    // Save result to backend
+    fetch('/api/save-game-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'breathing',
+        cycles: totalCycles,
+        durations: durations,
+        completed: true
+      })
+    });
+    vibrate(200);
+  }
+
+  // Event listeners
+  startBtn.addEventListener('click', () => {
+    if (isRunning) return;
+    resetExercise(); // ensure clean state
+    startPreparation();
+  });
+  pauseBtn.addEventListener('click', () => {
+    if (!isRunning) return;
+    if (isPaused) resumeExercise();
+    else pauseExercise();
+  });
+  resetBtn.addEventListener('click', () => {
+    resetExercise();
+  });
+  inhaleSlider.addEventListener('input', () => {
+    updateDurations();
+    if (!isRunning && !isPreparing) {
+      currentCountdown = durations[phases[currentPhaseIdx]];
+      updateUI();
+    }
+  });
+  holdSlider.addEventListener('input', updateDurations);
+  exhaleSlider.addEventListener('input', updateDurations);
+
+  // Initial UI setup
+  updateDurations();
+  resetExercise();
+</script>
+{% endblock %}

@@ -1,0 +1,428 @@
+{% extends "base.html" %}
+{% set step_index = 5 %}
+{% block title %}Memory Match{% endblock %}
+
+{% block head %}
+<style>
+  .game-controls {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .difficulty-selector {
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+    color: var(--white);
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .btn-sm {
+    background: var(--teal);
+    border: none;
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--navy);
+    cursor: pointer;
+    transition: background 0.18s;
+  }
+  .btn-sm:hover {
+    background: var(--teal-dim);
+  }
+  .game-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 1rem;
+  }
+  .stat-box {
+    background: var(--navy-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0.6rem;
+    text-align: center;
+  }
+  .stat-val {
+    font-family: var(--font-head);
+    font-size: 22px;
+  }
+  .stat-label {
+    font-size: 9px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .card-grid {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 1rem;
+    justify-content: center;
+  }
+  .grid-4x3 { grid-template-columns: repeat(4, 1fr); }
+  .grid-4x4 { grid-template-columns: repeat(4, 1fr); }
+  .grid-6x4 { grid-template-columns: repeat(6, 1fr); }
+
+  .mem-card {
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    perspective: 600px;
+    position: relative;
+    max-width: 80px;
+    margin: 0 auto;
+    width: 100%;
+  }
+  .mem-card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.35s ease;
+    border-radius: var(--radius-sm);
+  }
+  .mem-card.flipped .mem-card-inner,
+  .mem-card.matched .mem-card-inner {
+    transform: rotateY(180deg);
+  }
+  .mem-card.matched .card-back {
+    background: rgba(123,232,166,0.2);
+    border-color: var(--sage);
+  }
+  .card-front, .card-back {
+    position: absolute;
+    inset: 0;
+    border-radius: var(--radius-sm);
+    backface-visibility: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid var(--border);
+  }
+  .card-front {
+    background: var(--navy-card);
+    font-family: var(--font-head);
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--teal);
+  }
+  .card-back {
+    background: var(--slate);
+    transform: rotateY(180deg);
+    font-size: 18px;
+    flex-direction: column;
+  }
+  .card-back span:first-child {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .card-back span:last-child {
+    font-size: 8px;
+    color: var(--muted);
+    margin-top: 2px;
+  }
+  .card-front:hover {
+    border-color: var(--teal);
+    background: rgba(46,196,182,0.07);
+  }
+
+  #completeOverlay {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 1.5rem 1rem;
+    animation: fadeUp 0.5s ease;
+    background: var(--navy-card);
+    border-radius: var(--radius);
+    margin-top: 1rem;
+  }
+  #completeOverlay.show {
+    display: flex;
+  }
+  .flash-effect {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    background: rgba(46,196,182,0.15);
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 50;
+  }
+  @media (max-width: 500px) {
+    .card-front, .card-back { font-size: 14px; }
+    .card-back span:first-child { font-size: 16px; }
+    .stat-val { font-size: 18px; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page fade-up">
+  <p class="section-label">Activity — Memory Training</p>
+  <h2 class="page-title" style="font-size:22px;">Memory Match<br>Game</h2>
+  <p class="page-sub" style="font-size:12px;margin-top:0.3rem;">Match pairs. Fewer moves and faster time = higher score.</p>
+
+  <div class="game-controls">
+    <select id="difficultySelect" class="difficulty-selector">
+      <option value="4x3">Easy (4x3)</option>
+      <option value="4x4" selected>Normal (4x4)</option>
+      <option value="6x4">Hard (6x4)</option>
+    </select>
+    <button id="newGameBtn" class="btn-sm">⟳ New Game</button>
+  </div>
+
+  <div class="game-stats">
+    <div class="stat-box"><div class="stat-val" id="pairsVal" style="color:var(--teal);">0</div><div class="stat-label">Pairs Found</div></div>
+    <div class="stat-box"><div class="stat-val" id="movesVal" style="color:var(--white);">0</div><div class="stat-label">Moves</div></div>
+    <div class="stat-box"><div class="stat-val" id="timeVal" style="color:var(--gold);">0</div><div class="stat-label">Seconds</div></div>
+    <div class="stat-box"><div class="stat-val" id="scoreVal" style="color:var(--sage);">0</div><div class="stat-label">Score</div></div>
+  </div>
+
+  <div id="cardGrid" class="card-grid grid-4x4"></div>
+
+  <div id="completeOverlay">
+    <div style="width:64px;height:64px;border-radius:50%;background:rgba(123,232,166,0.18);border:2px solid var(--sage);display:flex;align-items:center;justify-content:center;margin-bottom:1rem;">
+      <span style="font-family:var(--font-head);font-size:14px;font-weight:700;color:var(--sage);">✓</span>
+    </div>
+    <h3 style="font-family:var(--font-head);font-size:22px;margin-bottom:0.5rem;">All Pairs Matched!</h3>
+    <p style="color:var(--muted);font-size:13px;line-height:1.6;max-width:260px;margin-bottom:0.5rem;" id="finalMsg"></p>
+    <p style="color:var(--muted);font-size:12px;margin-bottom:1.5rem;" id="scoreMsg"></p>
+    <button id="playAgainBtn" class="btn btn-primary" style="width:100%;max-width:240px;">Play Again</button>
+    <a href="/result" class="btn btn-ghost" style="width:100%;max-width:240px;margin-top:8px;">View Report</a>
+  </div>
+</div>
+
+<div class="flash-effect" id="flashEffect"></div>
+
+<script>
+  // ----- Game configuration -----
+  let currentDifficulty = '4x4';
+  let gridCols = 4, gridRows = 4;
+  let cardSymbols = [];
+  let cards = [];
+  let matched = [], moves = 0, pairsFound = 0, seconds = 0, gameScore = 0;
+  let flipped = [];
+  let locked = false;
+  let timerInterval = null;
+  let gameActive = false;
+  let gameCompleted = false;
+
+  // Symbol sets for each difficulty (can be letters or emojis)
+  const SYMBOL_SETS = {
+    '4x3': ['🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮'],
+    '4x4': ['🌟','🌙','☀️','⭐','💎','🌺','🍀','🌲'],
+    '6x4': ['🌈','⚡','🔥','💧','🌪️','❄️','🌋','🍃','🌸','🍁','🌵','🪨']
+  };
+  const LABELS = {
+    '🐶':'Dog','🐱':'Cat','🐭':'Mouse','🐹':'Hamster','🐰':'Rabbit','🦊':'Fox',
+    '🐻':'Bear','🐼':'Panda','🐨':'Koala','🐯':'Tiger','🦁':'Lion','🐮':'Cow',
+    '🌟':'Star','🌙':'Moon','☀️':'Sun','⭐':'Sparkle','💎':'Gem','🌺':'Flower',
+    '🍀':'Clover','🌲':'Tree','🌈':'Rainbow','⚡':'Bolt','🔥':'Fire','💧':'Drop',
+    '🌪️':'Tornado','❄️':'Snow','🌋':'Volcano','🍃':'Leaf','🌸':'Cherry','🍁':'Maple',
+    '🌵':'Cactus','🪨':'Rock'
+  };
+
+  // Vibration & visual feedback
+  const vibrateSupported = 'vibrate' in navigator;
+  function vibrate(pattern) { if (vibrateSupported && gameActive && !gameCompleted) navigator.vibrate(pattern); }
+  function flashScreen(color = 'rgba(46,196,182,0.2)') {
+    const flash = document.getElementById('flashEffect');
+    flash.style.backgroundColor = color;
+    flash.style.opacity = '1';
+    setTimeout(() => { flash.style.opacity = '0'; }, 100);
+  }
+
+  // Compute score based on moves, time, and max possible moves (perfect moves = totalPairs)
+  function computeScore(movesCnt, secondsElapsed, totalPairs) {
+    const perfectMoves = totalPairs; // minimum possible moves = number of pairs
+    const movePenalty = Math.max(0, movesCnt - perfectMoves);
+    const timePenalty = Math.max(0, secondsElapsed);
+    let rawScore = Math.floor(1000 - (movePenalty * 10) - (timePenalty * 2));
+    return Math.max(0, rawScore);
+  }
+
+  function updateStatsUI() {
+    document.getElementById('pairsVal').textContent = pairsFound;
+    document.getElementById('movesVal').textContent = moves;
+    document.getElementById('timeVal').textContent = seconds;
+    gameScore = computeScore(moves, seconds, cardSymbols.length);
+    document.getElementById('scoreVal').textContent = gameScore;
+  }
+
+  function startTimer() {
+    if (timerInterval) clearInterval(timerInterval);
+    timerInterval = setInterval(() => {
+      if (gameActive && !gameCompleted) {
+        seconds++;
+        updateStatsUI();
+      }
+    }, 1000);
+  }
+
+  function stopTimer() {
+    if (timerInterval) {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+  }
+
+  function resetGame() {
+    stopTimer();
+    gameActive = false;
+    gameCompleted = false;
+    flipped = [];
+    locked = false;
+    moves = 0;
+    pairsFound = 0;
+    seconds = 0;
+    gameScore = 0;
+    updateStatsUI();
+    document.getElementById('completeOverlay').classList.remove('show');
+    document.getElementById('cardGrid').style.display = 'grid';
+    // Build new deck
+    initGame();
+  }
+
+  function initGame() {
+    // Determine grid dimensions from difficulty
+    if (currentDifficulty === '4x3') { gridCols = 4; gridRows = 3; }
+    else if (currentDifficulty === '4x4') { gridCols = 4; gridRows = 4; }
+    else if (currentDifficulty === '6x4') { gridCols = 6; gridRows = 4; }
+    const totalPairs = (gridCols * gridRows) / 2;
+    let symbols = SYMBOL_SETS[currentDifficulty];
+    if (symbols.length < totalPairs) symbols = [...symbols, ...symbols.slice(0, totalPairs - symbols.length)];
+    cardSymbols = symbols.slice(0, totalPairs);
+    // Duplicate and shuffle
+    let deck = [...cardSymbols, ...cardSymbols];
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    cards = deck;
+    matched = new Array(cards.length).fill(false);
+    buildGrid();
+    gameActive = true;
+    startTimer();
+  }
+
+  function buildGrid() {
+    const grid = document.getElementById('cardGrid');
+    grid.className = `card-grid grid-${gridCols}x${gridRows}`;
+    grid.style.gridTemplateColumns = `repeat(${gridCols}, minmax(50px, 80px))`;
+    grid.innerHTML = '';
+    cards.forEach((sym, idx) => {
+      const card = document.createElement('div');
+      card.className = 'mem-card';
+      if (matched[idx]) card.classList.add('matched');
+      card.dataset.index = idx;
+      card.dataset.sym = sym;
+      const label = LABELS[sym] || '';
+      card.innerHTML = `
+        <div class="mem-card-inner">
+          <div class="card-front">?</div>
+          <div class="card-back">
+            <span>${sym}</span>
+            <span>${label}</span>
+          </div>
+        </div>`;
+      card.addEventListener('click', () => flipCard(card, idx));
+      grid.appendChild(card);
+    });
+  }
+
+  function flipCard(card, idx) {
+    if (!gameActive || gameCompleted) return;
+    if (locked) return;
+    if (matched[idx]) return;
+    if (card.classList.contains('flipped')) return;
+    if (flipped.length >= 2) return;
+
+    card.classList.add('flipped');
+    flipped.push({ card, idx });
+
+    if (flipped.length === 2) {
+      moves++;
+      updateStatsUI();
+      locked = true;
+      const [first, second] = flipped;
+      if (cards[first.idx] === cards[second.idx]) {
+        // Match
+        matched[first.idx] = true;
+        matched[second.idx] = true;
+        first.card.classList.add('matched');
+        second.card.classList.add('matched');
+        pairsFound++;
+        updateStatsUI();
+        vibrate(30);
+        flashScreen('rgba(46,196,182,0.25)');
+        flipped = [];
+        locked = false;
+        if (pairsFound === cardSymbols.length) {
+          endGame();
+        }
+      } else {
+        // Mismatch
+        vibrate(60);
+        flashScreen('rgba(255,107,107,0.2)');
+        setTimeout(() => {
+          first.card.classList.remove('flipped');
+          second.card.classList.remove('flipped');
+          flipped = [];
+          locked = false;
+        }, 800);
+      }
+    }
+  }
+
+  function endGame() {
+    gameActive = false;
+    gameCompleted = true;
+    stopTimer();
+    const totalPairs = cardSymbols.length;
+    const efficiency = Math.round((totalPairs / moves) * 100);
+    let msg = efficiency >= 80 ? 'Excellent memory! Your working memory is sharp.' :
+              efficiency >= 55 ? 'Good effort. Regular practice improves recall.' :
+                                 'Memory exercises build cognitive resilience. Keep playing!';
+    document.getElementById('finalMsg').textContent = msg;
+    document.getElementById('scoreMsg').innerHTML = `Moves: ${moves}<br>Time: ${seconds}s<br>Score: ${gameScore}`;
+    document.getElementById('completeOverlay').classList.add('show');
+    document.getElementById('cardGrid').style.display = 'none';
+
+    // Save result
+    fetch('/api/save-game-result', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'memory',
+        difficulty: currentDifficulty,
+        moves,
+        seconds,
+        score: gameScore,
+        efficiency,
+        completed: true
+      })
+    });
+  }
+
+  // Event listeners
+  document.getElementById('difficultySelect').addEventListener('change', (e) => {
+    currentDifficulty = e.target.value;
+    resetGame();
+  });
+  document.getElementById('newGameBtn').addEventListener('click', () => { resetGame(); });
+  document.getElementById('playAgainBtn').addEventListener('click', () => { resetGame(); });
+
+  // Start game
+  window.addEventListener('DOMContentLoaded', () => {
+    initGame();
+  });
+</script>
+{% endblock %}
