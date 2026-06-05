@@ -382,7 +382,7 @@
       } catch(e) {}
       existingPayload.cv_score = parseFloat(cvScore.toFixed(3));
       existingPayload.detected_emotion = finalExpr;
-      existingPayload.error_rate = 0; // No game played yet; set 0
+      existingPayload.error_rate = 0;
       sessionStorage.setItem('checkinPayload', JSON.stringify(existingPayload));
 
       // Send to backend
@@ -393,12 +393,20 @@
       })
       .then(r => r.json())
       .then(data => {
-        sessionStorage.setItem('analysisResult', JSON.stringify(data));
-        window.location.href = '/analysis';
+        console.log("✅ API response:", data);
+        if (data && data.score) {
+          sessionStorage.setItem('analysisResult', JSON.stringify(data));
+          window.location.href = '/analysis';
+        } else {
+          console.error("Invalid API response", data);
+          alert("Analysis failed. Please try again.");
+          window.location.href = '/scan';
+        }
       })
       .catch(err => {
-        console.error('API error', err);
-        window.location.href = '/analysis';
+        console.error("Fetch error:", err);
+        alert("Network error. Please check your connection.");
+        window.location.href = '/scan';
       });
     }
 
