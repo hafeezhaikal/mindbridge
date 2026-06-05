@@ -55,6 +55,23 @@
     background: rgba(195,177,225,0.15); color: var(--lilac);
     margin-bottom: 0.5rem;
   }
+  .error-message {
+    background: rgba(255,107,107,0.15);
+    border: 1px solid var(--coral);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin: 1rem 0;
+    text-align: center;
+  }
+  .loader {
+    width: 40px; height: 40px;
+    border: 3px solid var(--teal);
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 {% endblock %}
 
@@ -65,75 +82,113 @@
     <h2 class="page-title" style="font-size:24px;">AI Analysis<br>Results</h2>
   </div>
 
-  <div class="score-ring-wrap">
-    <div style="position:relative;width:140px;height:140px;">
-      <svg class="ring-svg" width="140" height="140" viewBox="0 0 100 100">
-        <circle class="ring-bg" cx="50" cy="50" r="45"/>
-        <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="45"/>
-      </svg>
-      <div class="ring-center">
-        <div class="ring-pct" id="scorePct">0%</div>
-        <div class="ring-label" id="statusLabel">--</div>
+  <!-- Loading spinner -->
+  <div id="loadingSpinner" style="text-align:center; padding:2rem;">
+    <div class="loader"></div>
+    <p style="margin-top:1rem;">Loading your analysis...</p>
+  </div>
+
+  <!-- Main content (hidden initially) -->
+  <div id="analysisContent" style="display:none;">
+    <div class="score-ring-wrap">
+      <div style="position:relative;width:140px;height:140px;">
+        <svg class="ring-svg" width="140" height="140" viewBox="0 0 100 100">
+          <circle class="ring-bg" cx="50" cy="50" r="45"/>
+          <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="45"/>
+        </svg>
+        <div class="ring-center">
+          <div class="ring-pct" id="scorePct">0%</div>
+          <div class="ring-label" id="statusLabel">--</div>
+        </div>
+      </div>
+      <div id="statusBadge" class="badge" style="margin-top:0.75rem;">--</div>
+    </div>
+
+    <div class="xai-tag">Explainable AI (XAI) Breakdown</div>
+    <div class="card" id="metricsCard">
+      <div class="metric-row">
+        <div><div class="metric-label">NLP Sentiment (x2, w=0.4)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-nlp" style="width:0%"></div></div></div>
+        <div class="metric-value" id="val-nlp">--</div>
+      </div>
+      <div class="metric-row">
+        <div><div class="metric-label">CV Facial Score (x3, w=0.3)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-cv" style="width:0%;background:var(--sky)"></div></div></div>
+        <div class="metric-value" id="val-cv">--</div>
+      </div>
+      <div class="metric-row">
+        <div><div class="metric-label">Reaction Time Deviation (x1, w=0.2)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-rt" style="width:0%;background:var(--gold)"></div></div></div>
+        <div class="metric-value" id="val-rt">--</div>
+      </div>
+      <div class="metric-row">
+        <div><div class="metric-label">Gameplay Error Rate (x4, w=0.1)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-er" style="width:0%;background:var(--coral)"></div></div></div>
+        <div class="metric-value" id="val-er">--</div>
+      </div>
+      <div class="metric-row">
+        <div><div class="metric-label">Detected Intent (from text)</div></div>
+        <div class="metric-value" id="intentDisplay">--</div>
       </div>
     </div>
-    <div id="statusBadge" class="badge" style="margin-top:0.75rem;">--</div>
-  </div>
 
-  <div class="xai-tag">Explainable AI (XAI) Breakdown</div>
-  <div class="card" id="metricsCard">
-    <div class="metric-row">
-      <div><div class="metric-label">NLP Sentiment (x2, w=0.4)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-nlp" style="width:0%"></div></div></div>
-      <div class="metric-value" id="val-nlp">--</div>
+    <div class="formula-card" id="formulaCard" style="margin-top:1rem;">
+      <p style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--lilac);margin-bottom:0.6rem;">Perceptron Formula</p>
+      <div class="formula-line">Z = (<span class="formula-var">w1</span> x x1) + (<span class="formula-var">w2</span> x x2) + (<span class="formula-var">w3</span> x x3) + (<span class="formula-var">w4</span> x x4) + b</div>
+      <div class="formula-line">Z = (<span class="formula-num" id="fw1">0.2</span> x <span class="formula-num" id="fx1">--</span>) + (<span class="formula-num" id="fw2">0.4</span> x <span class="formula-num" id="fx2">--</span>) + (<span class="formula-num" id="fw3">0.3</span> x <span class="formula-num" id="fx3">--</span>) + (<span class="formula-num" id="fw4">0.1</span> x <span class="formula-num" id="fx4">--</span>) - 0.5</div>
+      <div class="formula-line">Z = <span class="formula-result" id="fz">--</span></div>
+      <div class="formula-line">f(Z) = 1 / (1 + e<sup>-Z</sup>) = <span class="formula-result" id="fscore">--</span></div>
     </div>
-    <div class="metric-row">
-      <div><div class="metric-label">CV Facial Score (x3, w=0.3)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-cv" style="width:0%;background:var(--sky)"></div></div></div>
-      <div class="metric-value" id="val-cv">--</div>
-    </div>
-    <div class="metric-row">
-      <div><div class="metric-label">Reaction Time Deviation (x1, w=0.2)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-rt" style="width:0%;background:var(--gold)"></div></div></div>
-      <div class="metric-value" id="val-rt">--</div>
-    </div>
-    <div class="metric-row">
-      <div><div class="metric-label">Gameplay Error Rate (x4, w=0.1)</div><div class="metric-bar"><div class="metric-bar-fill" id="bar-er" style="width:0%;background:var(--coral)"></div></div></div>
-      <div class="metric-value" id="val-er">--</div>
-    </div>
-    <div class="metric-row">
-      <div><div class="metric-label">Detected Intent (from text)</div></div>
-    <div class="metric-value" id="intentDisplay">--</div>
-</div>
-  </div>
 
-  <div class="formula-card" id="formulaCard" style="margin-top:1rem;">
-    <p style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--lilac);margin-bottom:0.6rem;">Perceptron Formula</p>
-    <div class="formula-line">Z = (<span class="formula-var">w1</span> x x1) + (<span class="formula-var">w2</span> x x2) + (<span class="formula-var">w3</span> x x3) + (<span class="formula-var">w4</span> x x4) + b</div>
-    <div class="formula-line">Z = (<span class="formula-num" id="fw1">0.2</span> x <span class="formula-num" id="fx1">--</span>) + (<span class="formula-num" id="fw2">0.4</span> x <span class="formula-num" id="fx2">--</span>) + (<span class="formula-num" id="fw3">0.3</span> x <span class="formula-num" id="fx3">--</span>) + (<span class="formula-num" id="fw4">0.1</span> x <span class="formula-num" id="fx4">--</span>) - 0.5</div>
-    <div class="formula-line">Z = <span class="formula-result" id="fz">--</span></div>
-    <div class="formula-line">f(Z) = 1 / (1 + e<sup>-Z</sup>) = <span class="formula-result" id="fscore">--</span></div>
-  </div>
+    <div class="game-rec" id="gameRec" style="display:none;">
+      <p style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem;">Rule-Based Deployment</p>
+      <div class="game-rec-title" id="gameName">--</div>
+      <div class="game-rec-desc" id="gameDesc">--</div>
+      <div class="game-rec-reason" id="gameReason">--</div>
+    </div>
 
-  <div class="game-rec" id="gameRec" style="display:none;">
-    <p style="font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--gold);margin-bottom:0.4rem;">Rule-Based Deployment</p>
-    <div class="game-rec-title" id="gameName">--</div>
-    <div class="game-rec-desc" id="gameDesc">--</div>
-    <div class="game-rec-reason" id="gameReason">--</div>
-  </div>
-
-  <div style="display:flex;gap:10px;margin-top:0.5rem;">
-    <a href="/chatbot" class="btn btn-primary" style="flex:1;" id="chatBtn">Talk to AI Companion</a>
-    <a href="#" class="btn btn-ghost" id="skipGameBtn" style="flex:0 0 auto;font-size:12px;">Skip to Game</a>
+    <div style="display:flex;gap:10px;margin-top:0.5rem;">
+      <a href="/chatbot" class="btn btn-primary" style="flex:1;" id="chatBtn">Talk to AI Companion</a>
+      <a href="#" class="btn btn-ghost" id="skipGameBtn" style="flex:0 0 auto;font-size:12px;">Skip to Game</a>
+    </div>
   </div>
 </div>
 
 <script>
-  const data = JSON.parse(sessionStorage.getItem('analysisResult') || '{{ data | safe }}');
-
   const STATUS_COLORS = {
     danger:'var(--coral)', warning:'var(--gold)', caution:'#FFD700',
     info:'var(--sky)', success:'var(--sage)'
   };
 
   window.addEventListener('DOMContentLoaded', () => {
-    if (!data || !data.score) return;
+    const loading = document.getElementById('loadingSpinner');
+    const content = document.getElementById('analysisContent');
+
+    // Get data from sessionStorage first, then from Flask template
+    let rawData = sessionStorage.getItem('analysisResult');
+    if (!rawData) {
+      rawData = '{{ data | safe }}';
+    }
+
+    let data = null;
+    try {
+      data = JSON.parse(rawData);
+    } catch(e) {
+      console.error("Failed to parse analysis data", e);
+    }
+
+    // If no valid data, show error
+    if (!data || !data.score) {
+      loading.innerHTML = `
+        <div class="error-message">
+          <p style="color:var(--coral);font-weight:600;">⚠️ No analysis data found</p>
+          <p style="font-size:12px;margin-top:8px;">Please complete the face scan first.</p>
+          <a href="/scan" class="btn btn-primary" style="margin-top:12px;">Go to Face Scan</a>
+        </div>
+      `;
+      return;
+    }
+
+    // Hide spinner, show content
+    loading.style.display = 'none';
+    content.style.display = 'block';
+
     const pct = data.score_pct;
     const status = data.status;
     const nlp = data.nlp;
@@ -141,7 +196,7 @@
     const formula = data.formula;
 
     setTimeout(() => {
-      // Ring
+      // Ring animation
       const offset = 283 - (283 * pct / 100);
       const ring = document.getElementById('ringFill');
       ring.style.strokeDashoffset = offset;
@@ -170,7 +225,11 @@
       document.getElementById('val-er').textContent = data.error_rate.toFixed(2);
       document.getElementById('bar-er').style.width = (data.error_rate * 100) + '%';
 
-      // Formula
+      // Intent
+      const intentText = data.nlp.intent || 'None (positive sentiment)';
+      document.getElementById('intentDisplay').textContent = intentText;
+
+      // Formula values
       document.getElementById('fx1').textContent = data.reaction_deviation.toFixed(3);
       document.getElementById('fx2').textContent = nlpVal.toFixed(2);
       document.getElementById('fx3').textContent = data.cv_score.toFixed(2);
@@ -178,17 +237,14 @@
       document.getElementById('fz').textContent = formula.z.toFixed(4);
       document.getElementById('fscore').textContent = data.score.toFixed(4);
 
-      // Game rec
-      document.getElementById('gameName').textContent = game.name;
-      document.getElementById('gameDesc').textContent = game.description;
-      document.getElementById('gameReason').textContent = 'Why: ' + game.reason;
-      document.getElementById('gameRec').style.display = 'block';
-
-      document.getElementById('skipGameBtn').href = '/game/' + game.type;
-
-      const intentText = data.nlp.intent || 'None (positive sentiment)';
-      document.getElementById('intentDisplay').textContent = intentText;
-
+      // Game recommendation
+      if (game && game.name) {
+        document.getElementById('gameName').textContent = game.name;
+        document.getElementById('gameDesc').textContent = game.description;
+        document.getElementById('gameReason').textContent = 'Why: ' + game.reason;
+        document.getElementById('gameRec').style.display = 'block';
+        document.getElementById('skipGameBtn').href = '/game/' + game.type;
+      }
     }, 200);
   });
 </script>
