@@ -23,7 +23,7 @@ def compute_wellbeing_score(reaction_time_dev, nlp_sentiment, cv_facial, gamepla
     """
     # Default weights (neutral)
     w1, w2, w3, w4 = 0.2, 0.4, 0.3, 0.1
-    bias = -0.5
+    bias = -0.7
 
     # Emotion‑specific weight vectors (adjusted for happy)
     if emotion == "happy":
