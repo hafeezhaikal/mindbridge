@@ -360,12 +360,20 @@ def chatbot_reply():
     wellbeing_score = payload.get("score", 0.5)
     intent = payload.get("intent", None)
 
+    # Crisis detection (highest priority)
     crisis_keywords = ["suicide", "kill myself", "want to die", "end my life", "can't go on", "helpless"]
     if any(kw in user_msg for kw in crisis_keywords):
         reply = ("I hear that you're in a lot of pain. Please, reach out to a crisis line right now. "
                  "In the US: 988 (Suicide and Crisis Lifeline). UK: 111. International: findahelpline.com. "
                  "You are not alone – people care about you. 💙")
         return jsonify({"reply": reply})
+
+    # --- Game request detection (added) ---
+    game_keywords = ["game", "play", "activity", "recommend a game", "suggest a game"]
+    if any(kw in user_msg for kw in game_keywords):
+        game = get_game_recommendation(wellbeing_score)
+        reply = f"I recommend the **{game['name']}**. {game['description']}\n\nTap the button below to start."
+        return jsonify({"reply": reply, "game": game})
 
     for keyword, response in MENTAL_HEALTH_RESPONSES.items():
         if keyword in user_msg:
