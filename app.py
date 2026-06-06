@@ -23,9 +23,9 @@ def compute_wellbeing_score(reaction_time_dev, nlp_sentiment, cv_facial, gamepla
     """
     # Default weights (neutral)
     w1, w2, w3, w4 = 0.2, 0.4, 0.3, 0.1
-    bias = -0.7
+    bias = -0.8    # changed from -0.5 to -0.8 to make Memory Match reachable
 
-    # Emotion‑specific weight vectors (adjusted for happy)
+    # Emotion‑specific weight vectors
     if emotion == "happy":
         w1, w2, w3, w4 = 0.05, 0.05, 0.8, 0.1   # CV dominates (80%)
         bias = -1.4                              # Strong negative bias for happy → score ~23%
@@ -121,13 +121,13 @@ def analyse_free_text(text):
             break
     return detected_intent, round(nlp_score, 2)
 
-# ─── Game Selection Logic (with revised thresholds) ─────────────────────────
+# ─── Game Selection Logic (adjusted thresholds) ─────────────────────────────
 
 def get_game_recommendation(score):
     """
     Maps wellbeing score (0-1) to an activity.
-    - Very low stress (≤0.25) → Creative Expression (happy, relaxed)
-    - Low stress (0.26–0.40) → Memory Match (gentle engagement)
+    - Very low stress (≤0.35) → Creative Expression (happy, relaxed)
+    - Low stress (0.35–0.40) → Memory Match (gentle engagement)
     - Moderate stress (0.41–0.55) → Focus Tap (rebuild focus)
     - High stress (>0.55) → Breathing Exercise (calm down)
     """
@@ -448,23 +448,16 @@ def start_cloudflare_tunnel():
     )
     # Read stderr line by line to find the tunnel URL
     for line in process.stderr:
-        # Example line: "2024-01-01T00:00:00Z INF  https://random-name.trycloudflare.com"
         match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', line)
         if match:
             print(f"\n🌐 **Public HTTPS URL:** {match.group()}")
             print("   Share this link with anyone to access your MindBridge app.\n")
             break
-    # Keep the tunnel alive (don't let the subprocess end)
     process.wait()
 
 if __name__ == "__main__":
-    # Start Cloudflare tunnel in a background daemon thread
     tunnel_thread = threading.Thread(target=start_cloudflare_tunnel, daemon=True)
     tunnel_thread.start()
-    
-    # Give the tunnel a moment to establish connection
     time.sleep(2)
-    
-    # Start Flask app
     print("🚀 Starting Flask server on http://localhost:5000")
     app.run(debug=True, host='0.0.0.0', port=5000)
