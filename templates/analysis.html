@@ -72,6 +72,16 @@
     margin: 0 auto;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .debug-section {
+    margin-top: 1rem;
+    padding: 0.5rem;
+    background: rgba(0,0,0,0.3);
+    border-radius: 8px;
+    font-size: 10px;
+    color: #aaa;
+    text-align: left;
+    word-break: break-all;
+  }
 </style>
 {% endblock %}
 
@@ -148,6 +158,12 @@
       <a href="#" class="btn btn-ghost" id="skipGameBtn" style="flex:0 0 auto;font-size:12px;">Skip to Game</a>
     </div>
   </div>
+
+  <!-- Hidden debug section (click to expand) -->
+  <div class="debug-section" id="debugSection" style="display:none;">
+    <strong>🔧 Debug Info</strong><br>
+    <pre id="debugContent" style="margin:4px 0; font-size:10px; overflow-x:auto;"></pre>
+  </div>
 </div>
 
 <script>
@@ -159,11 +175,24 @@
   window.addEventListener('DOMContentLoaded', () => {
     const loading = document.getElementById('loadingSpinner');
     const content = document.getElementById('analysisContent');
+    const debugDiv = document.getElementById('debugSection');
+    const debugPre = document.getElementById('debugContent');
 
     // Get data from sessionStorage first, then from Flask template
     let rawData = sessionStorage.getItem('analysisResult');
+    let source = 'sessionStorage';
     if (!rawData) {
       rawData = '{{ data | safe }}';
+      source = 'Flask template';
+    }
+
+    // Show debug info if data is missing (helpful for troubleshooting)
+    if (!rawData || rawData === '{}' || rawData === 'null') {
+      debugDiv.style.display = 'block';
+      debugPre.textContent = `No data found in ${source}. Please complete the face scan.`;
+    } else {
+      debugDiv.style.display = 'block';
+      debugPre.textContent = `Source: ${source}\nRaw data: ${rawData.substring(0, 500)}`;
     }
 
     let data = null;
@@ -171,13 +200,13 @@
       data = JSON.parse(rawData);
     } catch(e) {
       console.error("Failed to parse analysis data", e);
+      debugPre.textContent += `\n\nJSON Parse Error: ${e.message}`;
     }
 
-    // If no valid data, show error
     if (!data || !data.score) {
       loading.innerHTML = `
         <div class="error-message">
-          <p style="color:var(--coral);font-weight:600;">⚠️ No analysis data found</p>
+          <p style="color:var(--coral);font-weight:600;">⚠️ No valid analysis data found</p>
           <p style="font-size:12px;margin-top:8px;">Please complete the face scan first.</p>
           <a href="/scan" class="btn btn-primary" style="margin-top:12px;">Go to Face Scan</a>
         </div>
