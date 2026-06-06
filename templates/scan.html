@@ -4,6 +4,7 @@
 
 {% block head %}
 <style>
+  /* (all styles exactly as in your current scan.html – unchanged) */
   .scan-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; }
   .camera-frame {
     position: relative;
@@ -221,7 +222,7 @@
 
 <script>
   (function() {
-    console.log("Enhanced face scan with expression averaging");
+    console.log("Enhanced face scan with weighted stress score (every detection counts)");
 
     // DOM elements
     const video = document.getElementById('webcam');
@@ -246,7 +247,6 @@
     let startTime = null;
     const SESSION_DURATION = 15000; // 15 seconds
 
-    // Store detections for accurate final decision
     let detectionLog = []; // each entry: { expr, confidence, stressScore }
     let faceDetectedFlag = false;
 
@@ -266,7 +266,6 @@
       progressFill.style.width = targetPercent + '%';
     }
 
-    // Map expression to stress score (0 = low stress, 1 = high stress)
     function expressionToStress(expression, confidence) {
       const map = {
         'happy': 0.20,
@@ -278,12 +277,10 @@
         'disgusted': 0.75
       };
       let base = map[expression] || 0.50;
-      // If confidence low, move toward neutral
       if (confidence < 0.6) base = base * 0.6 + 0.45 * 0.4;
       return Math.min(0.95, Math.max(0.10, base));
     }
 
-    // Draw bounding box and label
     function drawDetection(detection) {
       if (!detection || !detection.detection || !detection.expressions) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -306,7 +303,6 @@
       ctx.fillText(`${maxExpr} (${(maxConf*100).toFixed(0)}%)`, box.x, box.y - 6);
       ctx.shadowBlur = 0;
 
-      // Update pipeline stage 3 in real time
       if (currentStage >= 2 && !analysisCompleted) {
         valueSpans[3].textContent = `${maxExpr} (${(maxConf*100).toFixed(0)}%)`;
       }
@@ -318,31 +314,31 @@
       canvas.height = video.clientHeight;
     }
 
-    // Final decision: most frequent expression, with tie-breaking by confidence
-    function getFinalExpression() {
+    // Weighted average of all detections (no mode, uses every frame)
+    function getWeightedStressScore() {
       if (detectionLog.length === 0) {
-        return { expr: 'neutral', conf: 0.5, stress: 0.5 };
+        return { stress: 0.5, dominantExpr: 'neutral', avgConf: 0.5 };
       }
-      // Count frequency of each expression
-      const counts = {};
-      const confSums = {};
+      let totalWeight = 0;
+      let weightedStress = 0;
+      const exprWeights = {};
       for (let d of detectionLog) {
-        counts[d.expr] = (counts[d.expr] || 0) + 1;
-        confSums[d.expr] = (confSums[d.expr] || 0) + d.confidence;
+        const w = d.confidence;
+        totalWeight += w;
+        weightedStress += d.stressScore * w;
+        exprWeights[d.expr] = (exprWeights[d.expr] || 0) + w;
       }
-      // Find expression with highest count
-      let maxCount = 0;
-      let bestExpr = 'neutral';
-      for (let [expr, count] of Object.entries(counts)) {
-        if (count > maxCount) {
-          maxCount = count;
-          bestExpr = expr;
+      const avgStress = weightedStress / totalWeight;
+      let dominantExpr = 'neutral';
+      let maxWeight = 0;
+      for (let [expr, w] of Object.entries(exprWeights)) {
+        if (w > maxWeight) {
+          maxWeight = w;
+          dominantExpr = expr;
         }
       }
-      // Average confidence for best expression
-      const avgConf = confSums[bestExpr] / counts[bestExpr];
-      const stress = expressionToStress(bestExpr, avgConf);
-      return { expr: bestExpr, conf: avgConf, stress: stress };
+      const avgConf = maxWeight / totalWeight;
+      return { stress: avgStress, dominantExpr: dominantExpr, avgConf: avgConf };
     }
 
     function completeAnalysisAndRedirect() {
@@ -352,40 +348,34 @@
       if (scanLine) scanLine.style.display = 'none';
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      let finalExpr = 'neutral';
-      let finalConf = 0.5;
-      let cvScore = 0.5;
+      let finalStress, finalExpr;
       if (detectionLog.length > 0) {
-        const final = getFinalExpression();
-        finalExpr = final.expr;
-        finalConf = final.conf;
-        cvScore = final.stress;
+        const weighted = getWeightedStressScore();
+        finalStress = weighted.stress;
+        finalExpr = weighted.dominantExpr;
+        console.log(`Weighted stress: ${finalStress.toFixed(3)}, dominant: ${finalExpr}`);
       } else {
-        // No face detected at all – use default neutral
-        cvScore = 0.5;
+        finalStress = 0.5;
         finalExpr = 'neutral';
       }
 
-      // Display final score
-      scoreDisplay.textContent = (cvScore * 100).toFixed(0) + '%';
-      scoreDisplay.style.color = cvScore > 0.65 ? '#FF6B6B' : (cvScore > 0.4 ? '#FFD700' : '#7BE8A6');
+      scoreDisplay.textContent = (finalStress * 100).toFixed(0) + '%';
+      scoreDisplay.style.color = finalStress > 0.65 ? '#FF6B6B' : (finalStress > 0.4 ? '#FFD700' : '#7BE8A6');
       scoreDisplay.classList.add('show');
       const labels = ['Very Low Stress','Low Stress','Moderate Stress','High Stress','Very High Stress'];
-      scoreLabel.textContent = 'Facial stress indicator: ' + labels[Math.min(Math.floor(cvScore * 5), 4)];
-      updateStage(4, `${(cvScore*100).toFixed(0)}% stress`);
-      updateStage(5, cvScore.toFixed(3));
+      scoreLabel.textContent = 'Facial stress indicator: ' + labels[Math.min(Math.floor(finalStress * 5), 4)];
+      updateStage(4, `${(finalStress*100).toFixed(0)}% stress`);
+      updateStage(5, finalStress.toFixed(3));
 
-      // Prepare payload
       let existingPayload = {};
       try {
         existingPayload = JSON.parse(sessionStorage.getItem('checkinPayload') || '{}');
       } catch(e) {}
-      existingPayload.cv_score = parseFloat(cvScore.toFixed(3));
+      existingPayload.cv_score = parseFloat(finalStress.toFixed(3));
       existingPayload.detected_emotion = finalExpr;
       existingPayload.error_rate = 0;
       sessionStorage.setItem('checkinPayload', JSON.stringify(existingPayload));
 
-      // Send to backend
       fetch('/api/analyse-checkin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -469,7 +459,6 @@
           if (!video.videoWidth || analysisCompleted) return;
           const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224 })).withFaceExpressions();
           if (detection && detection.expressions) {
-            // Update UI for face detected
             if (!faceDetectedFlag) {
               faceDetectedFlag = true;
               cameraFrame.classList.add('face-detected');
@@ -477,21 +466,14 @@
             const { expr, conf } = drawDetection(detection);
             detectionCount++;
             detectionCountSpan.textContent = `Detections: ${detectionCount}`;
-            // Store for final decision
             const stress = expressionToStress(expr, conf);
             detectionLog.push({ expr: expr, confidence: conf, stressScore: stress });
-            // Update pipeline stages
             if (currentStage < 2) updateStage(2, 'face detected');
             if (currentStage < 3) updateStage(3, 'analysing...');
           } else {
-            // No face – clear canvas and remove green border if no face for a while
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            if (faceDetectedFlag) {
-              // We don't immediately remove border because face may reappear
-              // But after several attempts, we might show a message
-            }
           }
-        }, 200); // every 200ms for smooth drawing
+        }, 200);
 
         const endSession = () => {
           clearInterval(timerInterval);
@@ -525,7 +507,6 @@
       valueSpans[3].textContent = 'neutral';
       valueSpans[4].textContent = '0.50';
       valueSpans[5].textContent = '0.50';
-      // Set fallback payload
       let existingPayload = {};
       try {
         existingPayload = JSON.parse(sessionStorage.getItem('checkinPayload') || '{}');

@@ -19,16 +19,17 @@ def sigmoid(z):
 def compute_wellbeing_score(reaction_time_dev, nlp_sentiment, cv_facial, gameplay_error_rate, emotion="neutral"):
     """
     Dynamic weights based on detected emotion.
-    Emotion can be: happy, neutral, sad, angry, fearful, surprised.
+    Default (neutral): w1=0.2, w2=0.4, w3=0.3, w4=0.1, bias=-0.5
+    Emotions override weights and bias.
     """
     # Default weights (neutral)
     w1, w2, w3, w4 = 0.2, 0.4, 0.3, 0.1
-    bias = -0.8    # changed from -0.5 to -0.8 to make Memory Match reachable
+    bias = -0.5
 
     # Emotion‑specific weight vectors
     if emotion == "happy":
         w1, w2, w3, w4 = 0.05, 0.05, 0.8, 0.1   # CV dominates (80%)
-        bias = -1.4                              # Strong negative bias for happy → score ~23%
+        bias = -1.4                              # Strong negative bias for happy
     elif emotion == "sad":
         w1, w2, w3, w4 = 0.1, 0.6, 0.2, 0.1
         bias = -0.3
@@ -93,7 +94,6 @@ def analyse_free_text(text):
         return None, 0.50
     text_lower = text.lower()
     
-    # Compute sentiment score
     negative_words = ["not", "don't", "can't", "won't", "never", "no"]
     has_negation = any(w in text_lower for w in negative_words)
     positive_words = ["happy", "good", "great", "fine", "okay", "well", "better", "smooth", "smoothly", "excited", "wonderful"]
@@ -109,11 +109,9 @@ def analyse_free_text(text):
     raw_score = pos_count / total
     nlp_score = max(0.05, min(0.95, raw_score))
     
-    # If sentiment is happy (>0.7), ignore keyword intent
     if nlp_score > 0.7:
         return None, round(nlp_score, 2)
     
-    # Otherwise, try keyword matching for negative concerns
     detected_intent = None
     for keyword, intent in KEYWORD_INTENT_MAP.items():
         if keyword in text_lower:
@@ -121,15 +119,15 @@ def analyse_free_text(text):
             break
     return detected_intent, round(nlp_score, 2)
 
-# ─── Game Selection Logic (adjusted thresholds) ─────────────────────────────
+# ─── Game Selection Logic (Memory Match threshold lowered to 0.30) ──────────
 
 def get_game_recommendation(score):
     """
     Maps wellbeing score (0-1) to an activity.
-    - Very low stress (≤0.35) → Creative Expression (happy, relaxed)
-    - Low stress (0.35–0.40) → Memory Match (gentle engagement)
-    - Moderate stress (0.41–0.55) → Focus Tap (rebuild focus)
-    - High stress (>0.55) → Breathing Exercise (calm down)
+    - ≤0.30 → Creative Expression
+    - 0.31–0.40 → Memory Match
+    - 0.41–0.55 → Focus Tap
+    - >0.55 → Breathing Exercise
     """
     if score > 0.55:
         return {
@@ -147,7 +145,7 @@ def get_game_recommendation(score):
             "description": "Tap the targets as they appear to rebuild your concentration and reaction time.",
             "reason": "Your response patterns suggest moderate stress. This game reactivates cognitive engagement circuits."
         }
-    elif score > 0.35:
+    elif score > 0.30:
         return {
             "type": "memory",
             "name": "Memory Match Game",
@@ -176,7 +174,7 @@ def get_status(score):
     else:
         return {"label": "Stable / Happy", "level": "success", "color": "#7BE8A6"}
 
-# ─── Chatbot Response Engine ─────────────────────────────────────────────────
+# ─── Chatbot Response Engine (unchanged) ────────────────────────────────────
 
 CHATBOT_RESPONSES = {
     "high_stress": [
@@ -246,47 +244,34 @@ def get_chatbot_response(score, intent, user_message=""):
 # ─── Enhanced Mental Health Responses for Live Chat ─────────────────────────
 
 MENTAL_HEALTH_RESPONSES = {
-    # Stress & anxiety
     "stress": "Stress is your body's natural response to pressure. Try the 5-4-3-2-1 grounding technique: name 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste. It interrupts the stress loop in seconds.",
     "anxiety": "Anxiety often comes from worrying about the future. A quick breathing exercise: inhale for 4 seconds, hold for 4, exhale for 6. This activates your vagus nerve and calms the nervous system. Would you like a guided exercise?",
     "panic": "If you're having a panic attack, focus on slow, deep breaths. Place one hand on your chest and one on your belly, and breathe into your belly. You are safe. This feeling will pass.",
-    # Low mood / depression
     "sad": "Feeling sad is a human experience. Sometimes just naming it helps. What does sadness feel like in your body right now? (Heavy chest? Low energy?)",
     "depressed": "Depression can make everything feel heavy. Please know that this is not your fault and you deserve support. Reaching out to a therapist or counselor can be life-changing. Would you like me to share some resources?",
     "hopeless": "I hear that you're feeling hopeless. That's a very difficult place to be. Please consider contacting a crisis helpline – they are trained to support you. In the US: 988 (Suicide and Crisis Lifeline). UK: 111. International: find a local number at befriendly.org.",
-    # Sleep & fatigue
     "sleep": "Sleep hygiene can transform your mood. Try: same bedtime each night, no screens 30 minutes before bed, a cool dark room, and a wind-down routine like reading or gentle stretching. Would you like a sleep meditation?",
     "tired": "Fatigue can be physical or emotional. If you've been pushing hard, a 20-minute rest (even lying quietly) resets your cognitive batteries. Be kind to yourself.",
-    # Social isolation
     "lonely": "Loneliness is a signal that you need connection. Reaching out – even a simple text to a friend – can ease it. You can also try joining a club, volunteering, or a peer support group. You are not alone.",
     "friend": "Friendships take effort. Start small: send a meme, ask how their day was, or suggest a video call. Connection is a skill, not a talent.",
-    # Academic / work pressure
     "exam": "Exam stress is common. Break your study into 25-minute blocks (Pomodoro). After each block, take a 5-minute break – walk, stretch, drink water. Reward yourself after each cycle.",
     "assignment": "Overwhelmed by assignments? Write down every task, then pick the smallest one and do it for just 10 minutes. Starting is the hardest part.",
     "burnout": "Burnout is emotional exhaustion from prolonged stress. Recovery requires rest, boundaries, and often professional support. It's okay to step back.",
-    # Self-worth
     "worthless": "Your worth is not determined by your productivity or others' opinions. You matter simply because you exist. If these thoughts are persistent, please talk to a professional.",
     "useless": "That's a painful thought. Sometimes our inner critic is loud. Try writing down one small thing you did today that was kind or helpful – even just getting up counts.",
-    # Anger / emotional regulation
     "angry": "Anger is a signal that something matters to you. Instead of suppressing it, try taking a few deep breaths and then using 'I feel' statements. Would you like a quick anger release exercise?",
     "rage": "When anger feels overwhelming, remove yourself from the situation temporarily. Splash cold water on your face, go outside, or scream into a pillow. You are allowed to feel angry, but you also deserve to feel calm.",
-    # Relationships
     "family": "Family relationships can be complex. If conversations are hard, try writing a letter first. Set boundaries kindly: 'I love you, but I need to take a break right now.'",
     "breakup": "Heartbreak is real grief. Allow yourself to feel it, but also reach out to friends. Avoid isolation. This pain will ease with time, though it doesn't feel that way now.",
-    # Coping strategies
     "cope": "Healthy coping includes: exercise, sleep, talking to someone, creative outlets (art, music, writing), nature, and mindfulness. What activities have helped you in the past?",
     "breathe": "Here's a simple breathing exercise: Inhale 4 seconds, hold 7 seconds, exhale 8 seconds. Repeat 5 times. This lowers cortisol immediately.",
     "grounding": "Use the 5-4-3-2-1 technique: 5 things you see, 4 you can touch, 3 you hear, 2 you smell, 1 you taste. Do it now – it pulls your brain into the present.",
-    # Positive reinforcement
     "better": "I'm so glad you're feeling better! That's wonderful. Remember what helped you get here – you can use those tools anytime.",
     "good": "That's great to hear. Keeping a regular check‑in like this builds emotional resilience. Well done.",
-    # Explanations
     "how it works": "I use a simple AI model: I look at your check‑in (emotion + text), your face scan expression, and your reaction times. Each is weighted differently, and the final score is run through a sigmoid function to give a stress probability between 0 and 1. Then I match your words to mental health topics.",
     "ai": "I'm not a human, but I'm trained to recognise feelings and offer evidence‑based suggestions. I don't replace a therapist, but I can be a first step.",
-    # Help & crisis
     "help": "You deserve support. If you're in crisis, please contact a helpline: (US) 988 – Suicide & Crisis Lifeline. (UK) 111 – mental health triage. (Global) find a local number at findahelpline.com. You matter.",
     "suicide": "I'm really glad you reached out. That takes courage. Please contact a crisis line immediately: 988 (US) or your local emergency number. You are not alone, and there is help.",
-    # Games & activities
     "game": "Based on your current wellbeing score, I recommend the activity shown below. It's designed to gently improve your mood or focus.",
     "play": "Activities are most helpful when you're open to them. Even 5 minutes of a game can shift your brain state.",
 }
@@ -309,7 +294,6 @@ def analyse_checkin():
     free_text = data.get("free_text", "")
     reaction_time_ms = data.get("reaction_time_ms", 500)
 
-    # NLP
     intent, text_nlp_score = analyse_free_text(free_text)
     emotion_nlp_score = EMOTION_NLP_SCORES.get(emotion, 0.50)
     if free_text.strip():
@@ -317,17 +301,14 @@ def analyse_checkin():
     else:
         final_nlp = emotion_nlp_score
 
-    # Reaction time deviation
     baseline_ms = 500
     deviation = (baseline_ms - reaction_time_ms) / 1000.0
     deviation = max(-1.0, min(1.0, deviation))
 
-    # CV score and detected emotion (from frontend)
     cv_score = data.get("cv_score", round(random.uniform(0.3, 0.8), 2))
-    error_rate = data.get("error_rate", 0)   # No game played during scan, default 0
+    error_rate = data.get("error_rate", 0)
     detected_emotion = data.get("detected_emotion", "neutral").lower()
 
-    # Compute score with dynamic weights
     score, dynamic_weights = compute_wellbeing_score(deviation, final_nlp, cv_score, error_rate, detected_emotion)
     status = get_status(score)
     game = get_game_recommendation(score)
@@ -379,7 +360,6 @@ def chatbot_reply():
     wellbeing_score = payload.get("score", 0.5)
     intent = payload.get("intent", None)
 
-    # Crisis detection (highest priority)
     crisis_keywords = ["suicide", "kill myself", "want to die", "end my life", "can't go on", "helpless"]
     if any(kw in user_msg for kw in crisis_keywords):
         reply = ("I hear that you're in a lot of pain. Please, reach out to a crisis line right now. "
@@ -387,7 +367,6 @@ def chatbot_reply():
                  "You are not alone – people care about you. 💙")
         return jsonify({"reply": reply})
 
-    # Check against mental health responses dictionary
     for keyword, response in MENTAL_HEALTH_RESPONSES.items():
         if keyword in user_msg:
             if keyword == "game":
@@ -397,12 +376,10 @@ def chatbot_reply():
                 reply = response
             return jsonify({"reply": reply})
 
-    # Fallback to intent‑based coping strategy
     if intent and intent in CHATBOT_RESPONSES.get("coping_strategies", {}):
         reply = CHATBOT_RESPONSES["coping_strategies"][intent]
         return jsonify({"reply": reply})
 
-    # Default empathetic fallbacks
     fallbacks = [
         "Thank you for sharing that. How has this been affecting your daily life?",
         "I appreciate you opening up. Is there a specific area of your life where you feel this most strongly?",
@@ -435,29 +412,5 @@ def result():
                            data=json.dumps(analysis),
                            game_data=json.dumps(game_result))
 
-# ─── Cloudflare Tunnel Integration (single terminal) ─────────────────────────
-
-def start_cloudflare_tunnel():
-    """Launches cloudflared in a subprocess and prints the public HTTPS URL."""
-    process = subprocess.Popen(
-        ['cloudflared', 'tunnel', '--url', 'http://localhost:5000'],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        bufsize=1
-    )
-    # Read stderr line by line to find the tunnel URL
-    for line in process.stderr:
-        match = re.search(r'https://[a-zA-Z0-9-]+\.trycloudflare\.com', line)
-        if match:
-            print(f"\n🌐 **Public HTTPS URL:** {match.group()}")
-            print("   Share this link with anyone to access your MindBridge app.\n")
-            break
-    process.wait()
-
 if __name__ == "__main__":
-    tunnel_thread = threading.Thread(target=start_cloudflare_tunnel, daemon=True)
-    tunnel_thread.start()
-    time.sleep(2)
-    print("🚀 Starting Flask server on http://localhost:5000")
     app.run(debug=True, host='0.0.0.0', port=5000)
