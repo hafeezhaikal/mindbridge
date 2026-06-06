@@ -147,7 +147,7 @@ def get_game_recommendation(score):
             "description": "Tap the targets as they appear to rebuild your concentration and reaction time.",
             "reason": "Your response patterns suggest moderate stress. This game reactivates cognitive engagement circuits."
         }
-    elif score > 0.25:
+    elif score > 0.30:
         return {
             "type": "memory",
             "name": "Memory Match Game",
