@@ -360,7 +360,7 @@ def chatbot_reply():
     wellbeing_score = payload.get("score", 0.5)
     intent = payload.get("intent", None)
 
-    # Crisis detection (highest priority)
+    # Crisis detection
     crisis_keywords = ["suicide", "kill myself", "want to die", "end my life", "can't go on", "helpless"]
     if any(kw in user_msg for kw in crisis_keywords):
         reply = ("I hear that you're in a lot of pain. Please, reach out to a crisis line right now. "
@@ -368,21 +368,78 @@ def chatbot_reply():
                  "You are not alone – people care about you. 💙")
         return jsonify({"reply": reply})
 
-    # --- Game request detection (added) ---
+    # ----- Game request handling (enhanced) -----
     game_keywords = ["game", "play", "activity", "recommend a game", "suggest a game"]
+    # Mapping from user phrases to game type
+    game_name_map = {
+        "memory": "memory",
+        "memory match": "memory",
+        "match": "memory",
+        "focus": "focus_tap",
+        "focus tap": "focus_tap",
+        "tap": "focus_tap",
+        "breathing": "breathing",
+        "breathing exercise": "breathing",
+        "breathe": "breathing",
+        "creative": "creative",
+        "creative expression": "creative",
+        "express": "creative"
+    }
+
+    # Check if user mentioned a specific game
+    requested_game_type = None
+    for phrase, game_type in game_name_map.items():
+        if phrase in user_msg:
+            requested_game_type = game_type
+            break
+
+    if requested_game_type:
+        # Get the game details by type
+        if requested_game_type == "memory":
+            game = {
+                "type": "memory",
+                "name": "Memory Match Game",
+                "label": "Train Your Memory",
+                "description": "Match pairs of cards to stimulate working memory and gentle mental engagement."
+            }
+        elif requested_game_type == "focus_tap":
+            game = {
+                "type": "focus_tap",
+                "name": "Focus Tap Challenge",
+                "label": "Sharpen Your Focus",
+                "description": "Tap the targets as they appear to rebuild your concentration and reaction time."
+            }
+        elif requested_game_type == "breathing":
+            game = {
+                "type": "breathing",
+                "name": "Breathing Exercise",
+                "label": "Calm and Relax",
+                "description": "Guided box breathing to reduce cortisol and reset your nervous system."
+            }
+        elif requested_game_type == "creative":
+            game = {
+                "type": "creative",
+                "name": "Creative Expression",
+                "label": "Express Yourself",
+                "description": "Answer expressive prompts to process your emotions through creative choices."
+            }
+        else:
+            # fallback to wellbeing-based recommendation
+            game = get_game_recommendation(wellbeing_score)
+        
+        reply = f"Sure! Here's the **{game['name']}**. {game['description']}\n\nTap the button below to start."
+        return jsonify({"reply": reply, "game": game})
+
+    # If no specific game mentioned, check if user wants any game (generic request)
     if any(kw in user_msg for kw in game_keywords):
         game = get_game_recommendation(wellbeing_score)
         reply = f"I recommend the **{game['name']}**. {game['description']}\n\nTap the button below to start."
         return jsonify({"reply": reply, "game": game})
 
+    # ----- Rest of your chatbot logic (mental health responses, etc.) -----
     for keyword, response in MENTAL_HEALTH_RESPONSES.items():
         if keyword in user_msg:
-            if keyword == "game":
-                game = get_game_recommendation(wellbeing_score)
-                reply = f"{response}\n\nI recommend the **{game['name']}**. {game['description']}"
-            else:
-                reply = response
-            return jsonify({"reply": reply})
+            return jsonify({"reply": response})
 
     if intent and intent in CHATBOT_RESPONSES.get("coping_strategies", {}):
         reply = CHATBOT_RESPONSES["coping_strategies"][intent]
